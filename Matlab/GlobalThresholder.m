@@ -35,19 +35,7 @@ tic
     end
 end
 
-function [Threshold] = CollectThresholds(volume)
-[width,length,slices]=size(volume);
-for slice = 1:slices
-    [counts] = imhist(volume(:,:,slice));%get histogram for this slice of the volume
-    totalCounts= totalCounts+counts;           
-end
-        ThresholdRed(timepoint+1)=otsuthresh(totalCountsR);%this correction is because matlab starts at 1 and timepoints at 0
-        ThresholdGreen(timepoint+1)=otsuthresh(totalCountsG);
-    end
-    fileName = strcat(path, date,'/threshold_p_',num2str(position),'.csv');
-    thresholdArray = cat (2,ThresholdRed,ThresholdGreen);
-    csvwrite(fileName,thresholdArray)
-end
+
 
 function ThresholdImage(path, date, name, slices, timepoints, position, redThreshold,outfolder)
 imagesfilepath = strcat(path, date,'/imagesByTime');%declare name of directory to put images in
@@ -56,7 +44,7 @@ resultsfilePath = strcat(path, date,'/',outfolder);
 [~,~] = mkdir(resultsfilePath);
 
 for timepoint = 0:timepoints
-    singleColorResults = zeros(slices,3);%this is here for the simple version of the code without overlapping aggregate data
+    
     for slice = 0:slices
         filename = strcat(path, date,'/', name, '/', name, '_z', GetSlice(slice), '_t', GetSlice(timepoint),'_p', num2str(position));            
         I = stitchImage(filename);%collects tile of 4 images and opens in a range of 0 to 1
@@ -86,4 +74,3 @@ for timepoint = 0:timepoints
     csvwrite(resultsfilename,singleColorResults)
 end
 end
-

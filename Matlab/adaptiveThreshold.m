@@ -15,9 +15,20 @@ slices = size(imageFolder,1);
 for slice= 1:slices
     image = imread(strcat(directory,'/',imageFolder(slice).name));
     redVolume(:,:,slice) = squeeze(image(:,:,1)); 
-    greenVolume(:,:,slice) = squeeze(image(:,:,2));
+    greenVolume(:,:,slice) = squeeze(image(:,:,2)); 
     blueVolume(:,:,slice) = squeeze(image(:,:,3));
 end
 end
 
-function writeImageStack
+function [threshold] = CollectThresholds(volume)
+threshold = zeros(3,1);%three different kinds of thresholds
+[~,~,slices]=size(volume);
+for slice = 1:slices
+    [counts] = imhist(volume(:,:,slice));%get histogram for this slice of the volume
+    totalCounts= totalCounts+counts;           
+end
+threshold(2)=otsuthresh(totalCounts);%this correction is because matlab starts at 1 and timepoints at 0
+threshold(1)=otsuthresh(totalCounts);
+end
+
+%function writeImageStack
