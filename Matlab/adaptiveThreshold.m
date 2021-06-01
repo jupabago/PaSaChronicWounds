@@ -3,9 +3,10 @@ outputPathGlobal = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Globa
 outputPathAdaptive = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Adaptive Bin Tiff Stacks/wtd1-02/';
 
 [red,green,blue] = Stack2volume(inputPath);%split the image by the 3 channels.
-[adaIm015,otsuIm, otsuHand, differ] = BinarizeAndCompare (red);
+%[adaIm015,otsuIm, otsuHand, differ] = BinarizeAndCompare (red);
 %Volume2Stack(outputPathGlobal, otsuIm);
 %Volume2Stack(outputPathAdaptive, adaIm025);
+rgbImG = cat(3,ImNeR,ImNeG,ImB);
 
 function [adapI, otsuI,otsuHI, diff] = BinarizeAndCompare (volume)%This script compares the adaptive threshold with the global
 adapT = adaptthresh(volume, 0.15);
@@ -24,6 +25,16 @@ matching = nnz(adapI ==otsuI);
 diff = matching/(w*h*d);
 end
 
+function cleanVolume = CleanImage(volume)
+[width, height,slices] = size(volume);
+cleanVolume = zeros(width, height, slices);
+for slice= 1:slices
+    equalizedImg = histeq(slice);
+    weinerImage = bwareaopen(wiener2(equalizedImg , [10 10]),10);
+    cleanVolume(:,:,slice)= weinerImage;
+end
+end
+
 function [redVolume, greenVolume, blueVolume] = Stack2volume(directory)
 imageFolder=dir([directory '/*.tif']);%the star is for removing the two files that aren't tiffs
 slices = size(imageFolder,1);
@@ -38,12 +49,16 @@ for slice= 1:slices
 end
 end
 
-function Volume2Stack(directory, volume)
+function Volume2Stack(directory, volume1,volume2,volume3)
 [~,~] = mkdir(directory);
-[~,~,slices] = size(volume);
+[~,~,slices] = size(volume1);
 for slice= 1:slices
-imageName = strcat(directory,'/red_',GetSlice(slice),'.tif');%create image name to store
-imwrite(volume(:,:,slice),imageName);%save image
+imageName = strcat(directory,GetSlice(slice),'.tif');%create image name to store
+greenImage = volume1(:,:,slice)- volume2(:,:,slice);%correct for bleeding
+idx = A < 0;%this removes zeros
+A(idx) = 0;
+rgbImG = cat(3,volume1(:,:,slice),greenImage,volume3(:,:,slice));
+imwrite(rgbImG ,imageName);%save image
 end
 end
 
