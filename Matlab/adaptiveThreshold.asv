@@ -3,10 +3,14 @@ outputPathGlobal = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Globa
 outputPathAdaptive = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Adaptive Bin Tiff Stacks/wtd1-02/';
 
 [red,green,blue] = Stack2volume(inputPath);%split the image by the 3 channels.
+cleanRed = imbinarize(CleanImage(red));
+cleanGreen= imbinarize(CleanImage(green));
+cleanBlue = imbinarize(CleanImage(blue));
+Volume2Stack(directory, cleanRed,cleanGreen,cleanBlue)
 %[adaIm015,otsuIm, otsuHand, differ] = BinarizeAndCompare (red);
 %Volume2Stack(outputPathGlobal, otsuIm);
 %Volume2Stack(outputPathAdaptive, adaIm025);
-rgbImG = cat(3,ImNeR,ImNeG,ImB);
+    
 
 function [adapI, otsuI,otsuHI, diff] = BinarizeAndCompare (volume)%This script compares the adaptive threshold with the global
 adapT = adaptthresh(volume, 0.15);
@@ -54,8 +58,10 @@ function Volume2Stack(directory, volume1,volume2,volume3)
 [~,~,slices] = size(volume1);
 for slice= 1:slices
 imageName = strcat(directory,GetSlice(slice),'.tif');%create image name to store
-greenImage = volume1(:,:,slice)= volume2(:,:,slice);%correct for 
-rgbImG = cat(3,volume1(:,:,slice),volume2(:,:,slice),volume3(:,:,slice));
+greenImage = volume1(:,:,slice)- volume2(:,:,slice);%correct for bleeding
+idx = greenImage < 0;%this identifies zeros
+greenImage(idx) = 0;
+rgbImG = cat(3,volume1(:,:,slice),greenImage,volume3(:,:,slice));
 imwrite(rgbImG ,imageName);%save image
 end
 end
