@@ -2,15 +2,20 @@ inputPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks/
 outputPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/wtd1-02/';
 %{
 [ch1,ch2,ch3] = Stack2volume(inputPath);%split the image by the 3 channels.
-disp('cleaning channel 1')
-clean1 = imbinarize(CleanImage(ch1));
-disp('cleaning channel 2')
-clean2 = imbinarize(CleanImage(ch2));
-disp('cleaning channel 3')
-clean3 = imbinarize(CleanImage(ch3));
+disp('filtering and stretching channel 1')
+filtered1 = imbinarize(FilterImage(ch1));
+disp('filtering and stretching channel 2')
+filtered2 = imbinarize(FilterImage(ch2));
+disp('filtering and stretching channel 3')
+filtered3 = imbinarize(FilterImage(ch3));
 disp('combining and saving')
 %}
-Volume2Stack(outputPath, clean3,clean1, clean2);%Order is really important here
+%now remove bleeding from red into the green channel and isolated pixels
+%and create a clean volume
+%[cleanRed, cleanGreen, cleanBlue] = CleanExportVolume(outputPath, filtered3,filtered1, filtered2);%Order is really important here
+%Use clean volumes created to get aggregate sizes
+%redAggList=create3dStructure(cleanRed);
+greenAggList=create3dStructure(cleanGreen);
 
 
 %[adaIm015,otsuIm, otsuHand, differ] = BinarizeAndCompare (red);
@@ -35,13 +40,13 @@ matching = nnz(adapI ==otsuI);
 diff = matching/(w*h*d);
 end
 
-function cleanVolume = CleanImage(volume)
+function filteredVolume = FilterImage(volume)
 [width, height,slices] = size(volume);
-cleanVolume = zeros(width, height, slices);
+filteredVolume = zeros(width, height, slices);
 for slice= 1:slices
     stretchedImg = imadjust(volume(:,:,slice));
     weinerImage = wiener2(stretchedImg, [10 10]);
-    cleanVolume(:,:,slice)= weinerImage;
+    filteredVolume(:,:,slice)= weinerImage;
 end
 end
 
@@ -60,21 +65,39 @@ for slice= 1:slices
 end
 end
 
-function Volume2Stack(directory, redVolume,greenVolume,blueVolume)
+function [cleanRedVol,cleanGreenVol,cleanBlueVol]=CleanExportVolume(directory,redVolume,greenVolume,blueVolume)%create clean volumes and export them as tiffs
 [~,~] = mkdir(directory);
-[~,~,slices] = size(redVolume);
+[width, height,slices] = size(redVolume);
+[cleanRedVol, cleanGreenVol, cleanBlueVol]= deal(zeros(width, height, slices));
 for slice= 1:slices
 redImage = bwareaopen(redVolume(:,:,slice),10);
+cleanRedVol(:,:,slice) = redImage;
 greenImage = greenVolume(:,:,slice);
 greenImage = greenImage - redImage; %correct for bleeding
 idx = greenImage < 0;%this identifies zeros
 greenImage(idx) = 0;
 greenImage = bwareaopen(greenImage,10);
+cleanGreenVol(:,:,slice) = greenImage; 
 blueImage = bwareaopen(blueVolume(:,:,slice),10);
+cleanBlueVol(:,:,slice) = blueImage;
 imwrite(redImage,strcat(directory,'/R_',GetSlice(slice),'.tiff'));
 imwrite(greenImage,strcat(directory,'/G_',GetSlice(slice),'.tiff'));
 imwrite(blueImage,strcat(directory,'/B_',GetSlice(slice),'.tiff'));
 end
+end
+
+function aggregateSizeList = create3dStructure(cleanVolume)
+structure = bwconncomp(cleanVolume,18);
+totalAggregates = structure.NumObjects;
+aggregateSizeList = zeros(totalAggregates,1);
+for agg = 1:structure.NumObjects   
+    aggregateSizeList(agg,1)= GetObjectSize(structure,agg);%volume aggregate 1
+end
+end
+
+function objectSize = GetObjectSize(threeDStructure,aggNumber)
+objectSize = numel(threeDStructure.PixelIdxList{aggNumber});
+objectSize = objectSize*.264*.264*.440;
 end
 
 function slice = GetSlice(idx)
