@@ -1,6 +1,6 @@
-inputPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks/wtd1-03/';
-outputPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/wtd1-03/';
-
+inputPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks/wtd1-02/';
+outputPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/wtd1-02/';
+%{
 [red,green,blue] = Stack2volume(inputPath);%split the image by the 3 channels.
 disp('cleaning red channel')
 cleanRed = imbinarize(CleanImage(red));
@@ -9,7 +9,9 @@ cleanGreen= imbinarize(CleanImage(green));
 disp('cleaning blue channel')
 cleanBlue = imbinarize(CleanImage(blue));
 disp('combining and saving')
-Volume2Stack(directory, cleanRed,cleanGreen,cleanBlue);
+%}
+Volume2Stack(outputPath, cleanRed,cleanGreen,cleanBlue);
+
 
 %[adaIm015,otsuIm, otsuHand, differ] = BinarizeAndCompare (red);
 %Volume2Stack(outputPathGlobal, otsuIm);
@@ -37,15 +39,16 @@ function cleanVolume = CleanImage(volume)
 [width, height,slices] = size(volume);
 cleanVolume = zeros(width, height, slices);
 for slice= 1:slices
-    equalizedImg = histeq(slice);
-    weinerImage = bwareaopen(wiener2(equalizedImg , [10 10]),10);
+    stretchedImg = imadjust(volume(:,:,slice));
+    weinerImage = wiener2(stretchedImg, [10 10]);
     cleanVolume(:,:,slice)= weinerImage;
 end
 end
 
 function [redVolume, greenVolume, blueVolume] = Stack2volume(directory)
 imageFolder=dir([directory '/*.tif']);%the star is for removing the two files that aren't tiffs
-slices = size(imageFolder,1);
+slices = 10;
+%slices = size(imageFolder,1)
 [width, height,~] = size(imread(strcat(directory,'/',imageFolder(1).name)));
 [redVolume, greenVolume, blueVolume]= deal(zeros(width, height, slices));
 for slice= 1:slices
@@ -61,12 +64,16 @@ function Volume2Stack(directory, volume1,volume2,volume3)
 [~,~] = mkdir(directory);
 [~,~,slices] = size(volume1);
 for slice= 1:slices
-imageName = strcat(directory,GetSlice(slice),'.tif');%create image name to store
-greenImage = volume1(:,:,slice)- volume2(:,:,slice);%correct for bleeding
-idx = greenImage < 0;%this identifies zeros
-greenImage(idx) = 0;
-rgbImG = cat(3,volume1(:,:,slice),greenImage,volume3(:,:,slice));
-imwrite(rgbImG ,imageName);%save image
+redImage = bwareaopen(volume1(:,:,slice),10);
+greenImage = volume2(:,:,slice);
+%greenImage = volume2(:,:,slice)- volume1(:,:,slice);%correct for bleeding
+%idx = greenImage < 0;%this identifies zeros
+%greenImage(idx) = 0;
+greenImage = bwareaopen(greenImage,10);
+blueImage = bwareaopen(volume3(:,:,slice),10);
+imwrite(redImage,strcat(directory,'/G_',GetSlice(slice),'.tiff'));
+imwrite(greenImage,strcat(directory,'/B_',GetSlice(slice),'.tiff'));
+imwrite(blueImage,strcat(directory,'/R_',GetSlice(slice),'.tiff'));
 end
 end
 
