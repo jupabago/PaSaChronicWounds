@@ -1,16 +1,16 @@
 inputPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks/wtd1-02/';
 outputPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/wtd1-02/';
 %{
-[red,green,blue] = Stack2volume(inputPath);%split the image by the 3 channels.
-disp('cleaning red channel')
-cleanRed = imbinarize(CleanImage(red));
-disp('cleaning green channel')
-cleanGreen= imbinarize(CleanImage(green));
-disp('cleaning blue channel')
-cleanBlue = imbinarize(CleanImage(blue));
+[ch1,ch2,ch3] = Stack2volume(inputPath);%split the image by the 3 channels.
+disp('cleaning channel 1')
+clean1 = imbinarize(CleanImage(ch1));
+disp('cleaning channel 2')
+clean2 = imbinarize(CleanImage(ch2));
+disp('cleaning channel 3')
+clean3 = imbinarize(CleanImage(ch3));
 disp('combining and saving')
 %}
-Volume2Stack(outputPath, cleanRed,cleanGreen,cleanBlue);
+Volume2Stack(outputPath, clean3,clean1, clean2);%Order is really important here
 
 
 %[adaIm015,otsuIm, otsuHand, differ] = BinarizeAndCompare (red);
@@ -45,35 +45,35 @@ for slice= 1:slices
 end
 end
 
-function [redVolume, greenVolume, blueVolume] = Stack2volume(directory)
+function [ch1Volume, ch2Volume, ch3Volume] = Stack2volume(directory)
 imageFolder=dir([directory '/*.tif']);%the star is for removing the two files that aren't tiffs
 slices = 10;
 %slices = size(imageFolder,1)
 [width, height,~] = size(imread(strcat(directory,'/',imageFolder(1).name)));
-[redVolume, greenVolume, blueVolume]= deal(zeros(width, height, slices));
+[ch1Volume, ch2Volume, ch3Volume]= deal(zeros(width, height, slices));
 for slice= 1:slices
     imageInt = imread(strcat(directory,'/',imageFolder(slice).name));
     image = im2double(imageInt);
-    redVolume(:,:,slice) = squeeze(image(:,:,1)); 
-    greenVolume(:,:,slice) = squeeze(image(:,:,2)); 
-    blueVolume(:,:,slice) = squeeze(image(:,:,3));
+    ch1Volume(:,:,slice) = squeeze(image(:,:,1)); 
+    ch2Volume(:,:,slice) = squeeze(image(:,:,2)); 
+    ch3Volume(:,:,slice) = squeeze(image(:,:,3));
 end
 end
 
-function Volume2Stack(directory, volume1,volume2,volume3)
+function Volume2Stack(directory, redVolume,greenVolume,blueVolume)
 [~,~] = mkdir(directory);
-[~,~,slices] = size(volume1);
+[~,~,slices] = size(redVolume);
 for slice= 1:slices
-redImage = bwareaopen(volume1(:,:,slice),10);
-greenImage = volume2(:,:,slice);
-%greenImage = volume2(:,:,slice)- volume1(:,:,slice);%correct for bleeding
-%idx = greenImage < 0;%this identifies zeros
-%greenImage(idx) = 0;
+redImage = bwareaopen(redVolume(:,:,slice),10);
+greenImage = greenVolume(:,:,slice);
+greenImage = greenImage - redImage; %correct for bleeding
+idx = greenImage < 0;%this identifies zeros
+greenImage(idx) = 0;
 greenImage = bwareaopen(greenImage,10);
-blueImage = bwareaopen(volume3(:,:,slice),10);
-imwrite(redImage,strcat(directory,'/G_',GetSlice(slice),'.tiff'));
-imwrite(greenImage,strcat(directory,'/B_',GetSlice(slice),'.tiff'));
-imwrite(blueImage,strcat(directory,'/R_',GetSlice(slice),'.tiff'));
+blueImage = bwareaopen(blueVolume(:,:,slice),10);
+imwrite(redImage,strcat(directory,'/R_',GetSlice(slice),'.tiff'));
+imwrite(greenImage,strcat(directory,'/G_',GetSlice(slice),'.tiff'));
+imwrite(blueImage,strcat(directory,'/B_',GetSlice(slice),'.tiff'));
 end
 end
 
