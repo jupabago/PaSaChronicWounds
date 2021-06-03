@@ -15,6 +15,7 @@ disp('filtering and stretching channel 3')
 filtered3 = imbinarize(FilterImage(ch3));
 toc
 disp('combining and saving')
+sdsds
 
 %now remove bleeding from red into the green channel and isolated pixels
 %and create a clean volume
