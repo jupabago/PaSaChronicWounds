@@ -1,35 +1,55 @@
 rawTifPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks/wtd1-02/';
-binTifPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/wtd1-02/';
+binTifPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary adaptive Images/wtd1-02/';
 aggsFilePath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists/wtd1-02';
 %
+tic
 [ch1,ch2,ch3] = Stack2volume(rawTifPath);%split the image by the 3 channels.
+toc
 disp('filtering and stretching channel 1')
-filtered1 = imbinarize(FilterImage(ch1));
+%filtered1 = imbinarize(FilterImage(ch1));
+filtered1 = imbinarize (FilterImage(ch1), adaptthresh(FilterImage(ch1), 0.15));
+toc
 disp('filtering and stretching channel 2')
-filtered2 = imbinarize(FilterImage(ch2));
+%filtered2 = imbinarize(FilterImage(ch2));
+filtered2 = imbinarize (FilterImage(ch2), adaptthresh(FilterImage(ch2), 0.15));
+toc
 disp('filtering and stretching channel 3')
-filtered3 = imbinarize(FilterImage(ch3));
+%filtered3 = imbinarize(FilterImage(ch3));
+filtered3 = imbinarize (FilterImage(ch3), adaptthresh(FilterImage(ch3), 0.15));
+toc
 disp('combining and saving')
+sdsds
 
 %now remove bleeding from red into the green channel and isolated pixels
 %and create a clean volume
 [cleanRed, cleanGreen, cleanBlue] = CleanExportVolume(binTifPath, filtered3,filtered1, filtered2);%Order is really important here
 %Use clean volumes created to get aggregate sizes
+
+toc
+%{
+disp('creating aggregate structure red');
+
 redAggList=create3dStructure(cleanRed);
+toc
+disp('creating aggregate structure green');
 greenAggList=create3dStructure(cleanGreen);
+
+resultsfilenameRed = strcat(aggsFilePath ,'_red.csv');
+csvwrite(resultsfilenameRed,redAggList)
+resultsfilenameGreen = strcat(aggsFilePath ,'_green.csv');
+csvwrite(resultsfilenameGreen,greenAggList)
+toc
 %}
-resultsfilename = strcat(aggsFilePath ,'_red.csv');
-csvwrite(resultsfilename,redAggList)
-resultsfilename = strcat(aggsFilePath ,'_green.csv');
-csvwrite(resultsfilename,greenAggList)
+disp('done');
 
 function filteredVolume = FilterImage(volume)
 [width, height,slices] = size(volume);
 filteredVolume = zeros(width, height, slices);
 for slice= 1:slices
     stretchedImg = imadjust(volume(:,:,slice));
-    weinerImage = wiener2(stretchedImg, [10 10]);
-    filteredVolume(:,:,slice)= weinerImage;
+    %weinerImage = wiener2(stretchedImg, [10 10]);
+    %filteredVolume(:,:,slice)= weinerImage;
+    filteredVolume(:,:,slice)= stretchedImg; %this is for the adaptive version
 end
 end
 
