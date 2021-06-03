@@ -1,44 +1,39 @@
-inputPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks/wtd1-02/';
-outputPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/wtd1-02/';
-%{
-[ch1,ch2,ch3] = Stack2volume(inputPath);%split the image by the 3 channels.
+rawTifPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks/wtd1-02/';
+binTifPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/wtd1-02/';
+aggsFilePath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists/wtd1-02';
+%
+tic
+[ch1,ch2,ch3] = Stack2volume(rawTifPath);%split the image by the 3 channels.
+toc
 disp('filtering and stretching channel 1')
 filtered1 = imbinarize(FilterImage(ch1));
+toc
 disp('filtering and stretching channel 2')
 filtered2 = imbinarize(FilterImage(ch2));
+toc
 disp('filtering and stretching channel 3')
 filtered3 = imbinarize(FilterImage(ch3));
+toc
 disp('combining and saving')
-%}
+
 %now remove bleeding from red into the green channel and isolated pixels
 %and create a clean volume
-%[cleanRed, cleanGreen, cleanBlue] = CleanExportVolume(outputPath, filtered3,filtered1, filtered2);%Order is really important here
+[cleanRed, cleanGreen, cleanBlue] = CleanExportVolume(binTifPath, filtered3,filtered1, filtered2);%Order is really important here
 %Use clean volumes created to get aggregate sizes
-%redAggList=create3dStructure(cleanRed);
+toc
+disp('creating aggregate structure red');
+
+redAggList=create3dStructure(cleanRed);
+toc
+disp('creating aggregate structure green');
 greenAggList=create3dStructure(cleanGreen);
-
-
-%[adaIm015,otsuIm, otsuHand, differ] = BinarizeAndCompare (red);
-%Volume2Stack(outputPathGlobal, otsuIm);
-%Volume2Stack(outputPathAdaptive, adaIm025);
-    
-
-function [adapI, otsuI,otsuHI, diff] = BinarizeAndCompare (volume)%This script compares the adaptive threshold with the global
-adapT = adaptthresh(volume, 0.15);
-adapI = imbinarize (volume, adapT);
-adapI = (bwareaopen(adapI ,10));
-
-otsuHT = CollectThresholds(volume)
-otsuHI = imbinarize (volume, otsuHT);
-otsuHI= (bwareaopen(otsuHI,10));
-
-otsuI = imbinarize (volume);
-otsuI = (bwareaopen(otsuI ,10));
-
-[w,h,d] = size(volume);
-matching = nnz(adapI ==otsuI);
-diff = matching/(w*h*d);
-end
+%}
+resultsfilenameRed = strcat(aggsFilePath ,'_red.csv');
+csvwrite(resultsfilenameRed,redAggList)
+resultsfilenameGreen = strcat(aggsFilePath ,'_green.csv');
+csvwrite(resultsfilenameGreen,greenAggList)
+toc
+disp('done');
 
 function filteredVolume = FilterImage(volume)
 [width, height,slices] = size(volume);
@@ -50,16 +45,16 @@ for slice= 1:slices
 end
 end
 
-function [ch1Volume, ch2Volume, ch3Volume] = Stack2volume(directory)
+function [ch1Volume, ch2Volume, ch3Volume] = Stack2volume(directory)%takes a folder with tiffs and returns a 3d-volume/matrix
 imageFolder=dir([directory '/*.tif']);%the star is for removing the two files that aren't tiffs
-slices = 10;
-%slices = size(imageFolder,1)
-[width, height,~] = size(imread(strcat(directory,'/',imageFolder(1).name)));
-[ch1Volume, ch2Volume, ch3Volume]= deal(zeros(width, height, slices));
+%slices = 10;
+slices = size(imageFolder,1);
+[width, height,~] = size(imread(strcat(directory,'/',imageFolder(1).name)));%third dimension here is 3, one per channel
+[ch1Volume, ch2Volume, ch3Volume]= deal(zeros(width, height, slices)); %initialize matrix with zeros
 for slice= 1:slices
-    imageInt = imread(strcat(directory,'/',imageFolder(slice).name));
-    image = im2double(imageInt);
-    ch1Volume(:,:,slice) = squeeze(image(:,:,1)); 
+    imageInt = imread(strcat(directory,'/',imageFolder(slice).name));%read image. Intensity is not 0-1 yet
+    image = im2double(imageInt);%convert to 0-1 intensity values so that filters work and thresholding work as expected
+    ch1Volume(:,:,slice) = squeeze(image(:,:,1)); %separate channels. remember channels don't necessarily match colors in order
     ch2Volume(:,:,slice) = squeeze(image(:,:,2)); 
     ch3Volume(:,:,slice) = squeeze(image(:,:,3));
 end
@@ -97,7 +92,7 @@ end
 
 function objectSize = GetObjectSize(threeDStructure,aggNumber)
 objectSize = numel(threeDStructure.PixelIdxList{aggNumber});
-objectSize = objectSize*.264*.264*.440;
+objectSize = objectSize*.415*.415*.52;
 end
 
 function slice = GetSlice(idx)
@@ -118,4 +113,21 @@ for slice = 1:slices
     totalCounts= totalCounts+counts;     
 end
 threshold=otsuthresh(totalCounts);%this correction is because matlab starts at 1 and timepoints at 0
+end
+
+function [adapI, otsuI,otsuHI, diff] = BinarizeAndCompare (volume)%This script compares the adaptive threshold with the global
+adapT = adaptthresh(volume, 0.15);
+adapI = imbinarize (volume, adapT);
+adapI = (bwareaopen(adapI ,10));
+
+otsuHT = CollectThresholds(volume)
+otsuHI = imbinarize (volume, otsuHT);
+otsuHI= (bwareaopen(otsuHI,10));
+
+otsuI = imbinarize (volume);
+otsuI = (bwareaopen(otsuI ,10));
+
+[w,h,d] = size(volume);
+matching = nnz(adapI ==otsuI);
+diff = matching/(w*h*d);
 end
