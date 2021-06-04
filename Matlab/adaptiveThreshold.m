@@ -1,5 +1,5 @@
 rawTifPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks/wtd1-02/';
-binTifPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/wtd1-02/';
+binTifPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images larger wiener2/wtd1-02/';
 aggsFilePath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists/wtd1-02';
 %
 tic
@@ -19,6 +19,7 @@ disp('combining and saving')
 %now remove bleeding from red into the green channel and isolated pixels
 %and create a clean volume
 [cleanRed, cleanGreen, cleanBlue] = CleanExportVolume(binTifPath, filtered3,filtered1, filtered2);%Order is really important here
+%{
 %Use clean volumes created to get aggregate sizes
 toc
 disp('creating aggregate structure red');
@@ -27,11 +28,12 @@ redAggList=create3dStructure(cleanRed);
 toc
 disp('creating aggregate structure green');
 greenAggList=create3dStructure(cleanGreen);
-%}
+%
 resultsfilenameRed = strcat(aggsFilePath ,'_red.csv');
 csvwrite(resultsfilenameRed,redAggList)
 resultsfilenameGreen = strcat(aggsFilePath ,'_green.csv');
 csvwrite(resultsfilenameGreen,greenAggList)
+%}
 toc
 disp('done');
 
@@ -40,7 +42,7 @@ function filteredVolume = FilterImage(volume)
 filteredVolume = zeros(width, height, slices);
 for slice= 1:slices
     stretchedImg = imadjust(volume(:,:,slice));
-    weinerImage = wiener2(stretchedImg, [10 10]);
+    weinerImage = wiener2(stretchedImg, [width/8 height/8]);
     filteredVolume(:,:,slice)= weinerImage;
 end
 end
