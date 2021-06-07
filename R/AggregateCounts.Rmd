@@ -1,0 +1,48 @@
+---
+title: "AggregateCounts"
+author: "Juan P Barraza"
+date: "6/4/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+library(conflicted)
+library(tidyverse)
+filter <- dplyr::filter
+
+ReadAggregateFile(fileList[1], "Pa", "1", "wt")
+blah<-GetAggregates()
+
+datos <-read.csv(fileList[1], header = F)
+colnames(datos)<-c('Size')
+datos1<-datos %>% filter(!Size<0.5) #first filter the size
+
+ReadAggregateFile<-function(file, species, timepoint, condition, replicate){#make a dataframe of the aggregate size list and add experimental parameters
+   datos <-read.csv(file, header = F)
+   colnames(datos)<-c('Size')
+   datos<-datos %>% filter(!Size<0.5) #first filter the size
+   datos<-datos %>% mutate(Species = species)#add parameters
+   datos<-datos %>% mutate(TimePoint = timepoint)
+   datos<-datos %>% mutate(Condition = condition)
+   datos<-datos %>% mutate(Replicate = replicate)
+   datos$Species<-as.factor(datos$Species)
+   datos$Replicate<-as.factor(datos$Replicate)
+   datos$Condition<-as.factor(datos$Condition)
+   datos$TimePoint<-as.factor(datos$TimePoint)
+   return(datos)
+}
+
+GetAggregates<-function(){#import all experiments at once
+   folder<- paste0('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists')
+   fileList<-list.files(path = folder, full.names = TRUE)
+   growthDf<-data.frame()
+   for (aggList in 1:length(fileList)){
+     fileName<-str_split(basename(fileList[aggList]), "\\.")[[1]][1]#this selects the base file name and removes the ".csv"
+     attrList<-str_split(fileName,"_")[[1]]
+     growthDf<-rbind(growthDf,ReadAggregateFile(fileList[aggList],attrList[4],attrList[2],attrList[1],attrList[3]))
+     }
+   return(growthDf)
+}
+```
