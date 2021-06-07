@@ -68,15 +68,38 @@ ggplot()+
   theme(plot.title = element_text(hjust = 0.5))
 #####
 
-#create histograms, this takes a long time, so consider cutting them in chunks
+#Create histograms
+##this takes a long time, so consider running them in parts
 allDataGrouped<-aggregateList %>% group_by(Species, TimePoint, Condition)#first do the correct grouping
+#allDataGrouped<-aggregateList %>% group_by(Species, TimePoint, Condition, Sample)# this is to include sample on the distribution or keep it out
 allDataList<- group_split(allDataGrouped)#create list of dataframes
 allDataHistograms.5<-map2(allDataList, 5,TotalFancyHistogram)#apply histogram function to all items in the list
+allDataHistograms.5df<- bind_rows(allDataHistograms.5)#bring them together
 
-allDataHistograms.5df<- bind_rows(allDataHistograms.5)
+#Separating aggregates vs planktonic
+hist.plank.Agg.Sumary<-allDataHistograms.5df %>%  mutate(Aggregation = case_when(max == 5 ~ "Planktonic",max>5 ~ "Aggregate")) %>%
+  ungroup() %>%group_by(Species, TimePoint, Condition,Aggregation) %>% 
+  summarize(FrequencyAggregation = sum(frequency), BiomassAggregation = sum(BiomassBin), DensityAggregation = sum(Density))
+
+hist.plank.Agg.Stats<-hist.plank.Agg.Sumary %>% group_by(Species,TimePoint, Condition,Aggregation) %>%
+  summarise(MeanFreq = mean(FrequencyAggregation), SEFreq = std.error(FrequencyAggregation), MeanBiomass = mean(BiomassAggregation),
+            SEBiomass = std.error(BiomassAggregation),MeanDensity = mean(DensityAggregation), SEDensity = std.error(DensityAggregation))
+
+#Plotting these guys
+PlotAggsPlank<- function(){
+  ggplot()+
+    geom_col(data = hist.plank.Agg.Stats,aes(x=TimePoint,y=MeanBiomass, fill = Aggregation),size=3,position = position_dodge( width = .9))+
+    geom_errorbar(data = hist.plank.Agg.Stats,aes(x=TimePoint,ymin=MeanBiomass-SEBiomass, ymax = MeanBiomass+SEBiomass),size=.5,position = position_dodge2( width = .6))+
+    facet_grid(.~Species)+
+    labs(title = "Chronic Wounds", x = "", y = "Biomass contribution")+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+}
+PlotAggsPlank()
+
 
 ```
-```{r Histogram fucntions}
+```{r Histogram functions}
 FancyHistogram<-function(df, sec){#my own way of doing histograms which includes the sum and mean of values whitin each bin
   results<-data.frame()
   for( i in 1:(length(sec)-1)){ 
