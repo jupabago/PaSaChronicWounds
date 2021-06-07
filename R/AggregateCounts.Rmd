@@ -10,15 +10,16 @@ editor_options:
 ```{r setup, include=FALSE}
 library(conflicted)
 library(tidyverse)
+library(plotrix)#for std error
+library(cowplot)
 filter <- dplyr::filter
 
-ReadAggregateFile(fileList[1], "Pa", "1", "wt")
-blah<-GetAggregates()
 
-datos <-read.csv(fileList[1], header = F)
-colnames(datos)<-c('Size')
-datos1<-datos %>% filter(!Size<0.5) #first filter the size
+aggregateList<-GetAggregates()
+# mutate(Strain = recode(Position, "0" = "Pa14 wt", "1"= "Pa14 -PA1414","2" = "Pa14 wt", "3"= "Pa14 -PA1414")) #this is to change the names
 
+#agregate input functions
+#####
 ReadAggregateFile<-function(file, species, timepoint, condition, replicate){#make a dataframe of the aggregate size list and add experimental parameters
    datos <-read.csv(file, header = F)
    colnames(datos)<-c('Size')
@@ -45,4 +46,62 @@ GetAggregates<-function(){#import all experiments at once
      }
    return(growthDf)
 }
+#####
 ```
+```{r aggregate wrangling}
+aggregateListSummary<-aggregateList %>% group_by(Species, TimePoint, Condition) %>% 
+  summarise(Aggs = n(), biomass = sum(Size), meanAggSize = mean(Size), seAggSize = std.error(Size), maxSize = max(Size), minSize = min(Size)) %>%
+  ungroup() %>% mutate(RatioMaxTotal = maxSize/biomass ) 
+
+#plot agg summary
+#####
+ggplot()+
+  geom_point(data = aggregateListSummary, aes(x = TimePoint, y= meanAggSize, color = Species,shape = "MeanSize"))+
+  geom_point(data = aggregateListSummary, aes(x = TimePoint, y= maxSize, color = Species, shape = "MaxSize"))+
+  geom_point(data = aggregateListSummary, aes(x = TimePoint, y= biomass, color = Species, shape = "TotalBiomass"))+  
+  scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  facet_grid(. ~ Condition, scales = "free", space = "free") +
+  ggtitle('Aggregates: Mean, largest and total biomass (wild type)')+
+  labs(x = "",y = "Aggregate size (um3)")+
+  scale_shape_manual(name="Metric",values=c(MeanSize=1, MaxSize=2, TotalBiomass=17))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5))
+#####
+
+#create histograms, this takes a long time, so consider cutting them in chunks
+allDataGrouped<-aggregateList %>% group_by(Species, TimePoint, Condition)#first do the correct grouping
+allDataList<- group_split(allDataGrouped)#create list of dataframes
+allDataHistograms.5<-map2(allDataList, 5,TotalFancyHistogram)#apply histogram function to all items in the list
+
+allDataHistograms.5df<- bind_rows(allDataHistograms.5)
+
+```
+```{r Histogram fucntions}
+FancyHistogram<-function(df, sec){#my own way of doing histograms which includes the sum and mean of values whitin each bin
+  results<-data.frame()
+  for( i in 1:(length(sec)-1)){ 
+    blah<-df %>% filter(Size > sec[i] &Size<=sec[i+1])%>%summarise(frequency = n(), avg = mean(Size),suma = sum(Size)) %>% mutate(bin = i, min = sec[i],max = sec[i+1])
+    if(blah$frequency>0){ 
+      results<-rbind(results, blah)} 
+  }
+  return(results) 
+}
+TotalFancyHistogram<-function(df,binsize){
+  totalbiomass<-sum(df$Size)#total biomass per sample
+  totalfrequency<-length(df$Size)#total number of objects
+  upperLim<-max(df$Size)+binsize-(max(df$Size)%%binsize)#largest bin size based in largest object
+  breaksSequence<-seq(0,upperLim,binsize)#this makes breaks every "binsize" 
+  histogram<-FancyHistogram(df,breaksSequence)#apply "fancy histogram" to get distributions
+  histogram%>%mutate(BiomassBin=suma/totalbiomass)->histogram#add column with proportion of biomas per bin
+  histogram%>%mutate(Density=frequency/totalfrequency)->histogram#add column with proportion of counts per bin
+  histogram%>%mutate(Species=df$Species[1])->histogram#add column maintaining sample and so on...
+  histogram%>%mutate(Condition=df$Condition[1])->histogram
+  histogram%>%mutate(TimePoint=df$TimePoint[1])->histogram
+  histogram%>%mutate(Sample=df$Sample[1])->histogram
+  return(histogram)
+}
+```
+
+
+
+
