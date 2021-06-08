@@ -1,7 +1,23 @@
-rawTifPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks/wtd1-02/';
-binTifPath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images larger wiener2/wtd1-02/';
-aggsFilePath = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists/wtd1-02';
-%
+rawTifPathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks/';
+binTifPathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/';
+aggsFilePathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists/'; %names are different
+
+
+for image= 4:15
+rawTifPath = [rawTifPathBase,'wtd1-',GetNum(image),'/'];
+binTifPath = [binTifPathBase,'wtd1-',GetNum(image),'/'];
+aggsFilePath = [aggsFilePathBase,'wt_d1_',GetNum(image)];
+Tiff2Data (rawTifPath,binTifPath,aggsFilePath);
+end
+
+for image= 1:6
+rawTifPath = [rawTifPathBase,'wtd4-',GetNum(image),'/'];
+binTifPath = [binTifPathBase,'wtd4-',GetNum(image),'/'];
+aggsFilePath = [aggsFilePathBase,'wt_d4_',GetNum(image)];
+Tiff2Data (rawTifPath,binTifPath,aggsFilePath);
+end
+
+function Tiff2Data (rawTifPath,binTifPath, aggsFilePath)
 tic
 [ch1,ch2,ch3] = Stack2volume(rawTifPath);%split the image by the 3 channels.
 toc
@@ -16,10 +32,9 @@ filtered3 = imbinarize(FilterImage(ch3));
 toc
 disp('combining and saving')
 
-%now remove bleeding from red into the green channel and isolated pixels
-%and create a clean volume
-[cleanRed, cleanGreen, cleanBlue] = CleanExportVolume(binTifPath, filtered3,filtered1, filtered2);%Order is really important here
-%{
+%now remove bleeding from red into the green channel and isolated pixels and create a clean volume
+%%!!!Order is really important here, it is input as red, green blue
+[cleanRed, cleanGreen, cleanBlue] = CleanExportVolume(binTifPath, filtered3,filtered1, filtered2);
 %Use clean volumes created to get aggregate sizes
 toc
 disp('creating aggregate structure red');
@@ -28,21 +43,21 @@ redAggList=create3dStructure(cleanRed);
 toc
 disp('creating aggregate structure green');
 greenAggList=create3dStructure(cleanGreen);
-%
-resultsfilenameRed = strcat(aggsFilePath ,'_red.csv');
+resultsfilenameRed = strcat(aggsFilePath ,'_Sa.csv');
 csvwrite(resultsfilenameRed,redAggList)
-resultsfilenameGreen = strcat(aggsFilePath ,'_green.csv');
+resultsfilenameGreen = strcat(aggsFilePath ,'_Pa.csv');
 csvwrite(resultsfilenameGreen,greenAggList)
-%}
 toc
 disp('done');
+end
+
 
 function filteredVolume = FilterImage(volume)
 [width, height,slices] = size(volume);
 filteredVolume = zeros(width, height, slices);
 for slice= 1:slices
     stretchedImg = imadjust(volume(:,:,slice));
-    weinerImage = wiener2(stretchedImg, [width/8 height/8]);
+    weinerImage = wiener2(stretchedImg, [10 10]);
     filteredVolume(:,:,slice)= weinerImage;
 end
 end
@@ -106,6 +121,16 @@ else
     slice = strcat('00', num2str(idx));
 end
 end
+
+function imageNumber = GetNum(idx)
+if(idx>=10)
+    imageNumber =num2str(idx);
+else
+    imageNumber = strcat('0', num2str(idx));
+end
+end
+
+
 
 function threshold = CollectThresholds(volume)
 [~,~,slices]=size(volume);
