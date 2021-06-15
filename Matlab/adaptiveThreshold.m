@@ -56,8 +56,8 @@ function filteredVolume = FilterImage(volume)
 [width, height,slices] = size(volume);
 filteredVolume = zeros(width, height, slices);
 for slice= 1:slices
-    stretchedImg = imadjust(volume(:,:,slice));
-    weinerImage = wiener2(stretchedImg, [10 10]);
+    stretchedImg = imadjust(volume(:,:,slice));%maximizes range of intensity
+    weinerImage = wiener2(stretchedImg, [10 10]);%smooths image when it's low contrast and leaves it if high contrast
     filteredVolume(:,:,slice)= weinerImage;
 end
 end
@@ -82,11 +82,11 @@ function [cleanRedVol,cleanGreenVol,cleanBlueVol]=CleanExportVolume(directory,re
 [width, height,slices] = size(redVolume);
 [cleanRedVol, cleanGreenVol, cleanBlueVol]= deal(zeros(width, height, slices));
 for slice= 1:slices
-redImage = bwareaopen(redVolume(:,:,slice),10);
+redImage = bwareaopen(redVolume(:,:,slice),10);%remove isolated voxels
 cleanRedVol(:,:,slice) = redImage;
 greenImage = greenVolume(:,:,slice);
 greenImage = greenImage - redImage; %correct for bleeding
-idx = greenImage < 0;%this identifies zeros
+idx = greenImage < 0;%this identifies -1's
 greenImage(idx) = 0;
 greenImage = bwareaopen(greenImage,10);
 cleanGreenVol(:,:,slice) = greenImage; 
@@ -109,7 +109,7 @@ end
 
 function objectSize = GetObjectSize(threeDStructure,aggNumber)
 objectSize = numel(threeDStructure.PixelIdxList{aggNumber});
-objectSize = objectSize*.415*.415*.52;
+objectSize = objectSize*.415*.415*.52;%conversion of voxels to um^3
 end
 
 function slice = GetSlice(idx)
