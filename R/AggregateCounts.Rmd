@@ -11,21 +11,24 @@ editor_options:
 library(conflicted)
 library(tidyverse)
 library(plotrix)#for std error
+library(dplyr)
 library(cowplot)
 filter <- dplyr::filter
+source("~/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/PaSaChronicWounds/R/readTiff.R")
+library(EBImage) #for rtiff
 
 
-aggregateList<-GetAggregates()
+aggregateList<-GetAggregates()#this reads the data from Matlab
 # mutate(Strain = recode(Position, "0" = "Pa14 wt", "1"= "Pa14 -PA1414","2" = "Pa14 wt", "3"= "Pa14 -PA1414")) #this is to change the names
 
 #agregate input functions
 #####
-ReadAggregateFile<-function(file, species, timepoint, condition, replicate){#make a dataframe of the aggregate size list and add experimental parameters
-   datos <-read.csv(file, header = F)
-   colnames(datos)<-c('Size')
+ReadAggregateFile<-function(file, species, timepoint, condition, replicate){#make a dataframe of the aggregate size list and add experimental parameters 
+   datos <-read.csv(file, header = F)  
+   colnames(datos)<-c('Size') 
    datos<-datos %>% filter(!Size<0.5) #first filter the size
    datos<-datos %>% mutate(Species = species)#add parameters
-   datos<-datos %>% mutate(TimePoint = timepoint)
+   datos<-datos %>% mutate(TimePoint = timepoint) 
    datos<-datos %>% mutate(Condition = condition)
    datos<-datos %>% mutate(Replicate = replicate)
    datos$Species<-as.factor(datos$Species)
@@ -49,25 +52,159 @@ GetAggregates<-function(){#import all experiments at once
 #####
 ```
 ```{r aggregate wrangling}
-aggregateListSummary<-aggregateList %>% group_by(Species, TimePoint, Condition) %>% 
+#Statistics from all aggregates
+
+#Get aggregate summary per sample
+aggregateListSummaryReplicate<-aggregateList %>% group_by(Species, TimePoint, Condition, Replicate) %>% 
   summarise(Aggs = n(), biomass = sum(Size), meanAggSize = mean(Size), seAggSize = std.error(Size), maxSize = max(Size), minSize = min(Size)) %>%
   ungroup() %>% mutate(RatioMaxTotal = maxSize/biomass ) 
 
-#plot agg summary
+#Plot agg summary per sample
 #####
 ggplot()+
-  geom_point(data = aggregateListSummary, aes(x = TimePoint, y= meanAggSize, color = Species,shape = "MeanSize"))+
-  geom_point(data = aggregateListSummary, aes(x = TimePoint, y= maxSize, color = Species, shape = "MaxSize"))+
-  geom_point(data = aggregateListSummary, aes(x = TimePoint, y= biomass, color = Species, shape = "TotalBiomass"))+  
+  geom_jitter(data = aggregateListSummaryReplicate, aes(x = TimePoint, y= meanAggSize, color = Species,shape = "MeanSize"),size = 3, height = 0, width = .1)+
+  geom_jitter(data = aggregateListSummaryReplicate, aes(x = TimePoint, y= maxSize, color = Species, shape = "MaxSize"),size = 3, height = 0, width = .1)+
+  geom_jitter(data = aggregateListSummaryReplicate, aes(x = TimePoint, y= biomass, color = Species, shape = "TotalBiomass"),size = 3, height = 0, width = .1)+  
   scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
   facet_grid(. ~ Condition, scales = "free", space = "free") +
-  ggtitle('Aggregates: Mean, largest and total biomass (wild type)')+
-  labs(x = "",y = "Aggregate size (um3)")+
+  ggtitle('Mean size and largest aggregate and total biomass per sample')+
+  labs(x = "",y = "um3")+
   scale_shape_manual(name="Metric",values=c(MeanSize=1, MaxSize=2, TotalBiomass=17))+
   theme_cowplot()+
   theme(plot.title = element_text(hjust = 0.5))
 #####
 
+#Get aggregate Summary per condition
+aggregateListSummary<-aggregateList %>% group_by(Species, TimePoint, Condition) %>% 
+  summarise(Aggs = n(), biomass = sum(Size), meanAggSize = mean(Size), seAggSize = std.error(Size), maxSize = max(Size), minSize = min(Size)) %>%
+  ungroup() %>% mutate(RatioMaxTotal = maxSize/biomass ) 
+#plot agg summary per condition
+#####
+ggplot()+
+  geom_jitter(data = aggregateListSummary, aes(x = TimePoint, y= meanAggSize, color = Species,shape = "MeanSize"),size = 3, height = 0, width = .1)+
+  geom_jitter(data = aggregateListSummary, aes(x = TimePoint, y= maxSize, color = Species, shape = "MaxSize"),size = 3, height = 0, width = .1)+
+  geom_jitter(data = aggregateListSummary, aes(x = TimePoint, y= biomass, color = Species, shape = "TotalBiomass"),size = 3, height = 0, width = .1)+  
+  scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  facet_grid(. ~ Condition, scales = "free", space = "free") +
+  ggtitle('Mean size and largest aggregate and total biomass per sample')+
+  labs(x = "",y = "um3")+
+  scale_shape_manual(name="Metric",values=c(MeanSize=1, MaxSize=2, TotalBiomass=17))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5))
+#####
+```
+```{r non-fancy histogram}
+#histogram<- hist(aggregateList$Size, breaks = c(0, 5, 10, 100, 1000, 10^9))#this is a simple way to do a histogram
+
+#this pipe essentially gets to the producto of what fancy histograms do but more efficiently
+#First including all sizes
+#####
+newHistogram.df<-aggregateList %>% mutate(LogBin = case_when(Size <= 5 ~ 5,
+                        Size<= 10 ~ 10,
+                        Size<= 100    ~ 100,
+                        Size<= 1000   ~ 1000,
+                        Size<= 10000  ~ 10000,
+                        Size<= 100000 ~ 100000,
+                        Size > 100000 ~ 1000000)) %>% group_by(Species,Condition,TimePoint, Replicate)%>% 
+  mutate(TotalBiomass = sum(Size), TotalFrequency = n()) %>% ungroup() %>% group_by(Species,Condition,TimePoint, Replicate, LogBin)%>%
+  mutate(BinBiomass = sum(Size), BinFrequency = n()) %>% ungroup() %>%
+  mutate(NormalizedFrequency = BinFrequency/TotalFrequency*100, NormalizedBiomass = BinBiomass/TotalBiomass*100)
+
+#This is weird, but I want to have the histogram above with all the data, and the one below with only the bins
+newHistogramSummary.df<-newHistogram.df %>% group_by(Species,Condition,TimePoint, Replicate, LogBin,NormalizedFrequency,NormalizedBiomass) %>% summarize() %>%  unique()%>%ungroup() %>%  group_by(Species,Condition,TimePoint, Replicate) %>% mutate(checkSumFreq =sum(NormalizedFrequency), checkSumBiomass = sum(NormalizedBiomass))
+
+#now plot it
+ggplot()+
+    geom_jitter(data = newHistogramSummary.df,aes(x=as.factor(LogBin),y=NormalizedFrequency,  color =Species, ),size=3, height = 0, width = .2)+
+    scale_y_log10(breaks = c(100, 10, 1, .1, .01), labels = c(100, 10, 1, .1, .01))+
+    facet_grid(.~TimePoint)+
+    labs(y = "Frequency",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))  
+#####
+#now only aggregates 5 microns or larger
+#####
+aggsOnlyHist.df<-aggregateList %>% mutate(LogBin = case_when(Size <= 5 ~ 5,
+                        Size<= 10 ~ 10,
+                        Size<= 100    ~ 100,
+                        Size<= 1000   ~ 1000,
+                        Size<= 10000  ~ 10000,
+                        Size<= 100000 ~ 100000,
+                        Size > 100000 ~ 1000000)) %>% filter(!LogBin == 5) %>% group_by(Species,Condition,TimePoint, Replicate)%>% 
+  mutate(TotalBiomass = sum(Size), TotalFrequency = n()) %>% ungroup() %>% group_by(Species,Condition,TimePoint, Replicate, LogBin)%>%
+  mutate(BinBiomass = sum(Size), BinFrequency = n()) %>% ungroup() %>%
+  mutate(NormalizedFrequency = BinFrequency/TotalFrequency*100, NormalizedBiomass = BinBiomass/TotalBiomass*100)
+
+#This is weird, but I want to have the histogram above with all the data, and the one below with only the bins
+aggsOnlyHistSummary.df<-aggsOnlyHist.df %>% group_by(Species,Condition,TimePoint, Replicate, LogBin,NormalizedFrequency,NormalizedBiomass) %>% summarize() %>%  unique()%>%ungroup() %>%  group_by(Species,Condition,TimePoint, Replicate) %>% mutate(checkSumFreq =sum(NormalizedFrequency), checkSumBiomass = sum(NormalizedBiomass))
+
+#now plot it
+#normalized frequency
+ggplot()+
+    geom_jitter(data = aggsOnlyHistSummary.df,aes(x=as.factor(LogBin),y=NormalizedFrequency,  color =Species, ),size=3, height = 0, width = .2)+
+    scale_y_log10(breaks = c(100, 10, 1, .1, .01), labels = c(100, 10, 1, .1, .01))+
+    facet_grid(.~TimePoint)+
+    labs(y = "Frequency",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5)) 
+#Normalized Biomass facet timepoint, color species
+ggplot()+
+    geom_jitter(data = aggsOnlyHistSummary.df,aes(x=as.factor(LogBin),y=NormalizedBiomass,  color =Species, ),size=3, height = 0, width = .2)+
+    scale_y_log10(breaks = c(100, 10, 1, .1, .01), labels = c(100, 10, 1, .1, .01))+
+    facet_grid(.~TimePoint)+
+    labs(y = "Normalized Biomass",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5)) 
+#Normalized Biomass facet species, color timepoint
+ggplot()+
+    geom_jitter(data = aggsOnlyHistSummary.df,aes(x=as.factor(LogBin),y=NormalizedBiomass,  color =TimePoint, ),size=3, height = 0, width = .2)+
+    #scale_y_log10(breaks = c(100, 10, 1, .1, .01), labels = c(100, 10, 1, .1, .01))+
+    facet_grid(.~Species)+
+    labs(y = "Normalized Biomass",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5)) 
+#Normalized Biomass facet species and Timepoint, color Replicate
+ggplot()+
+    geom_line(data = aggsOnlyHistSummary.df,aes(x=as.factor(LogBin),y=NormalizedBiomass, color = Replicate, group = Replicate ),size=1)+
+    #scale_y_log10(breaks = c(100, 10, 1, .1, .01), labels = c(100, 10, 1, .1, .01))+
+    guides(color = FALSE)+
+    facet_grid(TimePoint~Species)+
+    labs(y = "Normalized Biomass",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    theme_cowplot()+
+    scale_colour_grey()+
+    theme(plot.title = element_text(hjust = 0.5)) 
+
+#####
+#Planktonic vs aggregates
+#####
+#Add agregation value to the dataframe
+newHistogram.df<-newHistogram.df %>%  mutate(Aggregation = case_when(LogBin == 5 ~ "Planktonic",LogBin>5 ~ "Aggregate")) %>%
+  group_by(Species,Condition,TimePoint, Replicate, Aggregation)%>% 
+  mutate(AgPlBiomass = sum(Size), AgPlFreq = n()) %>% ungroup() %>%
+  mutate(AgPlNormFrequency = AgPlFreq/TotalFrequency*100, AgPlNormBiomass = AgPlBiomass/TotalBiomass*100)
+#Sumarize in dataframe
+plankAggHist<-newHistogram.df %>% group_by(Species,Condition,TimePoint, Replicate, Aggregation,AgPlNormFrequency,AgPlNormBiomass) %>% summarize() %>%  unique()%>%ungroup() %>%  group_by(Species,Condition,TimePoint, Replicate) %>% mutate(checkAggFreq =sum(AgPlNormFrequency), checkAggBiomass = sum(AgPlNormBiomass))
+#plot Frequency
+ggplot()+
+    geom_jitter(data = plankAggHist,aes(x=as.factor(Aggregation),y=AgPlNormFrequency,  color =Species, ),size=3, height = 0, width = .2)+
+    #scale_y_log10(breaks = c(100, 10, 1, .1, .01), labels = c(100, 10, 1, .1, .01))+
+    facet_grid(.~TimePoint)+
+    labs(y = "Frequency",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5)) 
+ggplot()+
+    geom_jitter(data = plankAggHist,aes(x=as.factor(Aggregation),y=AgPlNormBiomass,  color =Species, ),size=3, height = 0, width = .2)+
+    #scale_y_log10(breaks = c(100, 10, 1, .1, .01), labels = c(100, 10, 1, .1, .01))+
+    facet_grid(.~TimePoint)+
+    labs(y = "Normalized Biomass",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5)) 
+
+
+#####
+```
+
+```{r fancy histogram of aggregates}
 #Create histograms
 ##this takes a long time, so consider running them in parts
 allDataGrouped<-aggregateList %>% group_by(Species, TimePoint, Condition)#first do the correct grouping
@@ -75,6 +212,45 @@ allDataGrouped<-aggregateList %>% group_by(Species, TimePoint, Condition)#first 
 allDataList<- group_split(allDataGrouped)#create list of dataframes
 allDataHistograms.5<-map2(allDataList, 5,TotalFancyHistogram)#apply histogram function to all items in the list
 allDataHistograms.5df<- bind_rows(allDataHistograms.5)#bring them together
+
+#plotting histogram data
+hist.5.LogBinSummarize<-allDataHistograms.5df %>% 
+  filter(!max == 5)%>% #remove planktonic cells, but this changes the nortmalization of aggregate counts, so the normalization needs to be done later for aggs only
+  group_by(Species,Condition,TimePoint)%>% mutate(LogBin = case_when(max <= 10 ~ 10,
+                        max<= 100    ~ 100,
+                        max<= 1000   ~ 1000,
+                        max<= 10000  ~ 10000,
+                        max<= 100000 ~ 100000,
+                        max > 100000 ~ 1000000)) %>% ungroup() %>% 
+  group_by(Species, Condition,TimePoint,LogBin) %>% summarise(FrequencyLogBin = sum(frequency), BiomassLogBin = sum(BiomassBin), DensityLogBin = sum(Density))
+
+#plot frequency  
+ggplot()+
+    geom_point(data = hist.5.LogBinSummarize,aes(x=as.factor(LogBin),y=FrequencyLogBin,  color =Species ),size=4)+
+    #labs(title = titulo)+
+    scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    facet_grid(.~TimePoint)+
+    labs(y = "Frequency",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    #guides(color = FALSE)+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+  
+  ggplot()+
+    geom_point(data = hist.5.LogBinSummarize,aes(x=as.factor(LogBin),y=BiomassLogBin,  color =Species ),size=4)+
+    scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    facet_grid(.~TimePoint)+
+    labs(y = "Biomass fraction per bin",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+  
+  ggplot()+
+    geom_point(data = hist.5.LogBinSummarize,aes(x=as.factor(LogBin),y=DensityLogBin,  color =Species ),size=4)+
+    scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    facet_grid(.~TimePoint)+
+    labs(y = "Biomass fraction per bin",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+  
 
 #Separating aggregates vs planktonic
 hist.plank.Agg.Sumary<-allDataHistograms.5df %>%  mutate(Aggregation = case_when(max == 5 ~ "Planktonic",max>5 ~ "Aggregate")) %>%
@@ -96,9 +272,35 @@ PlotAggsPlank<- function(){
     theme(plot.title = element_text(hjust = 0.5))
 }
 PlotAggsPlank()
+```
 
+```{r biomass per slice}
+#this was taken from "Microscopy data clean.Rmd"
+GetResults<-function(sample,){#points to folder with files. Folder is hardcoded, unfortunately
+  #folder<- paste0('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/', sample)
+  folder<- paste0('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/wtd1-02')
+  fileList<-list.files(path = folder, full.names = TRUE)
+  growthDf<-data.frame()
+  blueChannel<-fileList[grep('B_',fileList)]
+  for(slice in 1:length(filesList)/3){
+    counts<-sum(as.array(readImage(fileList[1], convert = TRUE)))
+    growthDf<-rbind(growthDf,c(counts, slice,species))
+    growthDf<-growthDf %>% mutate(Sample = samplename)
+return(growthDf)
+} }
+#this was taken from the PropOc package
+SlicesTo3D<-function(filesList,side){
+  image1<-readTiff(filesList[1])#read first image to get its dimensions
+  image3D <- array(0, c(image1@size[1], image1@size[2], length(filesList)))#preallocate array for image given using image dimensions
+  for(i in 1:length(filesList)/3){#keep in mind that it is not zero-index
+    #print(paste("loading ch1...", i, "/", length(filesList), filesList[i]))
+    image3D[,,i]<-as.array(readImage(fileList[1], convert = TRUE))
+  }
+  return(image3D)
+}
 
 ```
+
 ```{r Histogram functions}
 FancyHistogram<-function(df, sec){#my own way of doing histograms which includes the sum and mean of values whitin each bin
   results<-data.frame()
@@ -115,7 +317,7 @@ TotalFancyHistogram<-function(df,binsize){
   upperLim<-max(df$Size)+binsize-(max(df$Size)%%binsize)#largest bin size based in largest object
   breaksSequence<-seq(0,upperLim,binsize)#this makes breaks every "binsize" 
   histogram<-FancyHistogram(df,breaksSequence)#apply "fancy histogram" to get distributions
-  histogram%>%mutate(BiomassBin=suma/totalbiomass)->histogram#add column with proportion of biomas per bin
+  histogram%>%mutate(BiomassBin=suma/totalbiomass)->histogram#add column with proportion of biomass per bin
   histogram%>%mutate(Density=frequency/totalfrequency)->histogram#add column with proportion of counts per bin
   histogram%>%mutate(Species=df$Species[1])->histogram#add column maintaining sample and so on...
   histogram%>%mutate(Condition=df$Condition[1])->histogram
