@@ -19,14 +19,13 @@ Tiff2Data (rawTifPath,binTifPath,aggsFilePath);
 end
 %}
 
-rawTifPath = [rawTifPathBase,'phzd1-07/'];
-binTifPath = [binTifPathBase,'phz_d1_07/'];
-aggsFilePath = [aggsFilePathBase,'phz_d1_07'];
-slicedAggsFilePath = [slicedAggsFilePathBase,'phz_d1_07'];
-Tiff2Data (rawTifPath,binTifPath,aggsFilePath,slicedAggsFilePath);
+rawTifPath = [rawTifPathBase,'wtd4-7/'];
+binTifPath = [binTifPathBase,'wt_d4_',GetNum(image),'/'];
+aggsFilePath = [aggsFilePathBase,'wt_d4_',GetNum(image)];
+Tiff2Data (rawTifPath,binTifPath,aggsFilePath);
 
 
-function Tiff2Data (rawTifPath,binTifPath, aggsFilePath,slicedAggsPath)
+function Tiff2Data (rawTifPath,binTifPath, aggsFilePath)
 tic
 [ch1,ch2,ch3] = Stack2volume(rawTifPath);%split the image by the 3 channels.
 toc
@@ -112,8 +111,10 @@ aggResultRow = ((slice-1)*3)+1;
 slicedAggsResults(aggResultRow,1)= nnz(redImage);
 slicedAggsResults(aggResultRow+1,1)= nnz(greenImage);
 slicedAggsResults(aggResultRow+2,1)= nnz(blueImage);
-%add species as channels since matlab doesnt like strings in matrices
-slicedAggsResults(aggResultRow:aggResultRow+2,2)= 1:3;%this is nice because I can just add all those simultaneously
+%add species
+slicedAggsResults(aggResultRow,2)= "Sa";
+slicedAggsResults(aggResultRow+1,2)= "Pa";
+slicedAggsResults(aggResultRow+2,2)= "host";
 %add the slice number
 slicedAggsResults(aggResultRow:aggResultRow+2,3)= slice;%this is nice because I can just add all those simultaneously
 end
