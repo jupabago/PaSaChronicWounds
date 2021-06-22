@@ -18,26 +18,30 @@ aggsFilePath = [aggsFilePathBase,'wt_d4_',GetNum(image)];
 Tiff2Data (rawTifPath,binTifPath,aggsFilePath);
 end
 %}
+for sampleName = 3:5
 
-rawTifPath = [rawTifPathBase,'monod4-01/'];
-binTifPath = [binTifPathBase,'mono_d4_01/'];
-aggsFilePath = [aggsFilePathBase,'mono_d4_01'];
-slicedAggsFilePath = [slicedAggsFilePathBase,'mono_d4_01'];
-Tiff2Data (rawTifPath,binTifPath,aggsFilePath,slicedAggsFilePath);
+rawTifPath = [rawTifPathBase,'mono_d4_',GetNum(sampleName),'/'];
+binTifPath = [binTifPathBase,'mono_d4_',GetNum(sampleName),'/'];
+aggsFilePath = [aggsFilePathBase,'mono_d4_',GetNum(sampleName)];
+slicedAggsFilePath = [slicedAggsFilePathBase,'mono_d4_',GetNum(sampleName)];
+xySize = .415; %.208 or .132
+zSize = .52; %.365 or .361
+Tiff2Data (rawTifPath,binTifPath,aggsFilePath,slicedAggsFilePath, xySize, zSize);
+end
 
-
-function Tiff2Data (rawTifPath,binTifPath, aggsFilePath,slicedAggsPath)
+function Tiff2Data (rawTifPath,binTifPath, aggsFilePath,slicedAggsPath, xySize, zSize)
+wienerSize = ceil(5/xySize); %image filter neighborhod set at 5 microns
 tic
 [ch1,ch2,ch3] = Stack2volume(rawTifPath);%split the image by the 3 channels.
 toc
 disp('filtering and stretching channel 1')
-filtered1 = imbinarize(FilterImage(ch1));
+filtered1 = imbinarize(FilterImage(ch1, wienerSize));
 toc
 disp('filtering and stretching channel 2')
-filtered2 = imbinarize(FilterImage(ch2));
+filtered2 = imbinarize(FilterImage(ch2, wienerSize));
 toc
 disp('filtering and stretching channel 3')
-filtered3 = imbinarize(FilterImage(ch3));
+filtered3 = imbinarize(FilterImage(ch3, wienerSize));
 toc
 disp('combining and saving')
 
@@ -47,13 +51,12 @@ disp('combining and saving')
 %Use clean volumes created to get aggregate sizes
 toc
 disp('creating aggregate structure red');
-
-redAggList=create3dStructure(cleanRed);
-toc
-disp('creating aggregate structure green');
-greenAggList=create3dStructure(cleanGreen);
+redAggList=create3dStructure(cleanRed, xySize, zSize);
 resultsfilenameRed = strcat(aggsFilePath ,'_Sa.csv');
 csvwrite(resultsfilenameRed,redAggList)
+toc
+disp('creating aggregate structure green');
+greenAggList=create3dStructure(cleanGreen, xySize, zSize);
 resultsfilenameGreen = strcat(aggsFilePath ,'_Pa.csv');
 csvwrite(resultsfilenameGreen,greenAggList)
 toc
@@ -61,12 +64,12 @@ disp('done');
 end
 
 
-function filteredVolume = FilterImage(volume)
+function filteredVolume = FilterImage(volume, wienerSize)
 [width, height,slices] = size(volume);
 filteredVolume = zeros(width, height, slices);
 for slice= 1:slices
     stretchedImg = imadjust(volume(:,:,slice));%maximizes range of intensity
-    weinerImage = wiener2(stretchedImg, [10 10]);%smooths image when it's low contrast and leaves it if high contrast
+    weinerImage = wiener2(stretchedImg, [wienerSize wienerSize]);%smooths image when it's low contrast and leaves it if high contrast
     filteredVolume(:,:,slice)= weinerImage;
 end
 end
@@ -121,18 +124,18 @@ resultsfilename = strcat(slicedAggsDirectory,'.csv');
 csvwrite(resultsfilename,slicedAggsResults)
 end
 
-function aggregateSizeList = create3dStructure(cleanVolume)
+function aggregateSizeList = create3dStructure(cleanVolume, xySize, zSize)
 structure = bwconncomp(cleanVolume,18);
 totalAggregates = structure.NumObjects;
 aggregateSizeList = zeros(totalAggregates,1);
 for agg = 1:structure.NumObjects   
-    aggregateSizeList(agg,1)= GetObjectSize(structure,agg);%volume aggregate 1
+    aggregateSizeList(agg,1)= GetObjectSize(structure,agg,xySize, zSize);%volume aggregate 1
 end
 end
 
-function objectSize = GetObjectSize(threeDStructure,aggNumber)
+function objectSize = GetObjectSize(threeDStructure,aggNumber,xySize, zSize)
 objectSize = numel(threeDStructure.PixelIdxList{aggNumber});
-objectSize = objectSize*.415*.415*.52;%conversion of voxels to um^3
+objectSize = objectSize*xySize*xySize*zSize;%conversion of voxels to um^3
 end
 
 function slice = GetSlice(idx)
