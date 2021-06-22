@@ -154,7 +154,7 @@ end
 end
 
 
-
+%deprecated functions
 function threshold = CollectThresholds(volume)
 [~,~,slices]=size(volume);
 totalCounts = 0;
