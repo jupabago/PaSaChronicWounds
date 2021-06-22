@@ -1,32 +1,44 @@
+%{
 rawTifPathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks New/';
 binTifPathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/';
 aggsFilePathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists/'; %names are different
 slicedAggsFilePathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Results per slice/'; %names are different
 
-%{
-for image= 4:15
-rawTifPath = [rawTifPathBase,'wtd1-',GetNum(image),'/'];
-binTifPath = [binTifPathBase,'wt_d1_',GetNum(image),'/'];
-aggsFilePath = [aggsFilePathBase,'wt_d1_',GetNum(image)];
-Tiff2Data (rawTifPath,binTifPath,aggsFilePath);
-end
-
-for image= 1:6
-rawTifPath = [rawTifPathBase,'wtd4-',GetNum(image),'/'];
-binTifPath = [binTifPathBase,'wt_d4_',GetNum(image),'/'];
-aggsFilePath = [aggsFilePathBase,'wt_d4_',GetNum(image)];
-Tiff2Data (rawTifPath,binTifPath,aggsFilePath);
-end
-%}
-for sampleName = 3:5
-
-rawTifPath = [rawTifPathBase,'mono_d4_',GetNum(sampleName),'/'];
-binTifPath = [binTifPathBase,'mono_d4_',GetNum(sampleName),'/'];
-aggsFilePath = [aggsFilePathBase,'mono_d4_',GetNum(sampleName)];
-slicedAggsFilePath = [slicedAggsFilePathBase,'mono_d4_',GetNum(sampleName)];
+for sampleNumber = 1:2
+rawTifPath = [rawTifPathBase,'mono_d1_',GetNum(sampleNumber),'/'];
+binTifPath = [binTifPathBase,'mono_d1_',GetNum(sampleNumber),'/'];
+aggsFilePath = [aggsFilePathBase,'mono_d1_',GetNum(sampleNumber)];
+slicedAggsFilePath = [slicedAggsFilePathBase,'mono_d1_',GetNum(sampleNumber)];
 xySize = .415; %.208 or .132
 zSize = .52; %.365 or .361
 Tiff2Data (rawTifPath,binTifPath,aggsFilePath,slicedAggsFilePath, xySize, zSize);
+end
+%}
+
+for sampleNumber = 1:2
+iterateSamples('mono_d1_',sampleNumber,.415,.52)
+end
+
+for sampleNumber = 3:8
+iterateSamples('mono_d1_',sampleNumber,.208,.52)
+end
+
+for sampleNumber = 9:15
+iterateSamples('mono_d1_',sampleNumber,.208,.365)
+end
+
+
+
+function iterateSamples(sampleName, sampleNum,xy,z)
+rawTifPathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks New/';
+binTifPathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/';
+aggsFilePathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists/'; %names are different
+slicedAggsFilePathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Results per slice/'; %names are different
+rawTifPath = [rawTifPathBase,sampleName,GetNum(sampleNum),'/'];
+binTifPath = [binTifPathBase,sampleName,GetNum(sampleNum),'/'];
+aggsFilePath = [aggsFilePathBase,sampleName,GetNum(sampleNum)];
+slicedAggsFilePath = [slicedAggsFilePathBase,sampleName,GetNum(sampleNum)];
+Tiff2Data (rawTifPath,binTifPath,aggsFilePath,slicedAggsFilePath, xy, z);
 end
 
 function Tiff2Data (rawTifPath,binTifPath, aggsFilePath,slicedAggsPath, xySize, zSize)
