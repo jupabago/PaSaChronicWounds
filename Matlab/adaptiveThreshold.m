@@ -1,4 +1,4 @@
-rawTifPathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks/';
+rawTifPathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks New/';
 binTifPathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/';
 aggsFilePathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists/'; %names are different
 slicedAggsFilePathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Results per slice/'; %names are different
@@ -19,10 +19,10 @@ Tiff2Data (rawTifPath,binTifPath,aggsFilePath);
 end
 %}
 
-rawTifPath = [rawTifPathBase,'phzd1-07/'];
-binTifPath = [binTifPathBase,'phz_d1_07/'];
-aggsFilePath = [aggsFilePathBase,'phz_d1_07'];
-slicedAggsFilePath = [slicedAggsFilePathBase,'phz_d1_07'];
+rawTifPath = [rawTifPathBase,'monod4-01/'];
+binTifPath = [binTifPathBase,'mono_d4_01/'];
+aggsFilePath = [aggsFilePathBase,'mono_d4_01'];
+slicedAggsFilePath = [slicedAggsFilePathBase,'mono_d4_01'];
 Tiff2Data (rawTifPath,binTifPath,aggsFilePath,slicedAggsFilePath);
 
 
@@ -43,7 +43,7 @@ disp('combining and saving')
 
 %now remove bleeding from red into the green channel and isolated pixels and create a clean volume
 %%!!!Order is really important here, it is input as red, green blue, but matlab doesnt let you do it in the actual function
-[cleanRed, cleanGreen, cleanBlue] = CleanExportVolume(binTifPath, filtered3,filtered1, filtered2, slicedAggsPath);
+[cleanRed, cleanGreen, cleanBlue] = CleanExportVolume(binTifPath, filtered1,filtered2, filtered3, slicedAggsPath);
 %Use clean volumes created to get aggregate sizes
 toc
 disp('creating aggregate structure red');
