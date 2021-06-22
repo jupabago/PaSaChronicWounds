@@ -293,7 +293,7 @@ ggplot()+
           legend.position = c(0.79, 0.60))
 #####
 ```
-```{r fancy histogram of aggregates}
+```{r fancy histogram of aggregates !!!deprecated}
 #Create histograms
 ##this takes a long time, so consider running them in parts
 allDataGrouped<-aggregateList %>% group_by(Species, TimePoint, Condition)#first do the correct grouping
@@ -366,14 +366,35 @@ PlotAggsPlank()
 ```{r biomass per slice}
 #this was taken from "Microscopy data clean.Rmd"
 GetResults<-function(){
-  folder<- paste0('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/wtd1-02')
-  fileList<-list.files(path = folder, full.names = TRUE)
+  folder<- '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images'
+  samplesList<-list.files(path = folder, full.names = TRUE)
+  imagesList<-mapply(list.files,samplesList)
+  
+separateColors
   blueChannel<-fileList[grep('B_',fileList)]
   redChannel<-fileList[grep('R_',fileList)]
   greenChannel<-fileList[grep('G_',fileList)]
   Results<-rbind(blueChannel,redChannel,greenChannel)
   Results<-Results %>% mutate(Sample = sample)
-IterateTiff<-function(fileList, species)
+  
+  
+   fileList<-list.files(path = folder, full.names = TRUE)
+   growthDf<-data.frame()
+   for (aggList in 1:length(fileList)){
+     fileName<-str_split(basename(fileList[aggList]), "\\.")[[1]][1]#this selects the base file name and removes the ".csv"
+     attrList<-str_split(fileName,"_")[[1]]
+     growthDf<-rbind(growthDf,ReadAggregateFile(fileList[aggList],attrList[4],attrList[2],attrList[1],attrList[3]))
+     }
+   return(growthDf)
+}
+  
+  VectorizeTiff<-function(file){
+    counts<-sum(as.array(readImage(fileList[slice], convert = TRUE)))
+    growth[slice,]<-c(counts, slice, species)
+  }
+  
+  
+  IterateTiff<-function(fileList, species)
   growth<-matrix(ncol=3, nrow=length(fileList))
   for(slice in 1:(length(fileList))){
     counts<-sum(as.array(readImage(fileList[slice], convert = TRUE)))
@@ -382,6 +403,8 @@ IterateTiff<-function(fileList, species)
   growthDf<-data.fram(growth)
 return(growthDf) 
   }
+
+
 
 testGetResults<-GetResults()
 testGetResults.df<- data.frame(testGetResults)
