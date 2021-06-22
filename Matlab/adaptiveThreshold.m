@@ -15,11 +15,7 @@ Tiff2Data (rawTifPath,binTifPath,aggsFilePath,slicedAggsFilePath, xySize, zSize)
 end
 %}
 
-for sampleNumber = 1:2
-iterateSamples('mono_d1_',sampleNumber,.415,.52)
-end
-
-for sampleNumber = 3:8
+for sampleNumber = 4:8
 iterateSamples('mono_d1_',sampleNumber,.208,.52)
 end
 
@@ -38,6 +34,7 @@ rawTifPath = [rawTifPathBase,sampleName,GetNum(sampleNum),'/'];
 binTifPath = [binTifPathBase,sampleName,GetNum(sampleNum),'/'];
 aggsFilePath = [aggsFilePathBase,sampleName,GetNum(sampleNum)];
 slicedAggsFilePath = [slicedAggsFilePathBase,sampleName,GetNum(sampleNum)];
+disp(['Sample ',sampleName,GetNum(sampleNum)])
 Tiff2Data (rawTifPath,binTifPath,aggsFilePath,slicedAggsFilePath, xy, z);
 end
 
@@ -48,12 +45,15 @@ tic
 toc
 disp('filtering and stretching channel 1')
 filtered1 = imbinarize(FilterImage(ch1, wienerSize));
+clear ch1
 toc
 disp('filtering and stretching channel 2')
 filtered2 = imbinarize(FilterImage(ch2, wienerSize));
+clear ch2
 toc
 disp('filtering and stretching channel 3')
 filtered3 = imbinarize(FilterImage(ch3, wienerSize));
+clear ch3
 toc
 disp('combining and saving')
 
@@ -84,6 +84,7 @@ for slice= 1:slices
     weinerImage = wiener2(stretchedImg, [wienerSize wienerSize]);%smooths image when it's low contrast and leaves it if high contrast
     filteredVolume(:,:,slice)= weinerImage;
 end
+clear volume %empty original volume from memory
 end
 
 function [ch1Volume, ch2Volume, ch3Volume] = Stack2volume(directory)%takes a folder with tiffs and returns a 3d-volume/matrix
