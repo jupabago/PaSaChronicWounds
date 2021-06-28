@@ -20,13 +20,24 @@ library(EBImage) #for rtiff
 
 ```{r aggregate input}
 aggregateList<-GetAggregates()#this reads the data from Matlab
-# mutate(Strain = recode(Position, "0" = "Pa14 wt", "1"= "Pa14 -PA1414","2" = "Pa14 wt", "3"= "Pa14 -PA1414")) #this is to change the names
+#remove bad samples and irrelevant conditions
+##first remove irrelevant conditions
 removable <- aggregateList %>% filter(Species == "Pa" & Condition == "mono")
 aggregateList <- anti_join(aggregateList, removable)
+##bad samples
+aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "mono_d1_03_Pa" & !SampleCode == "mono_d1_03_Sa")
+aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "phz_d4_14_Pa" & !SampleCode == "phz_d4_14_Sa")
+aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "pqsL_d4_02_Pa" & !SampleCode == "pqsL_d4_02_Sa")
+aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "pqsL_d4_04_Pa" & !SampleCode == "pqsL_d4_04_Sa")
+aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "pqsL_d4_10_Pa" & !SampleCode == "pqsL_d4_10_Sa")
+aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "wt_d4_07_Pa" & !SampleCode == "wt_d4_07_Sa")
 
+#add proper labels for plots
+aggregateList$Species <- factor(aggregateList$Species, levels = c("Pa", "Sa"),labels = c('P. aeruginosa','S. aureus'))
+aggregateList$Condition <- factor(aggregateList$Condition, levels = c("mono", "wt", "pqsL", "phz"),labels = c('Sa mono','wt co', 'pqsL co', 'phz co'))
+aggregateList$TimePoint <- factor(aggregateList$TimePoint, levels = c("d1", "d4"),labels = c('Day 1','Day 4'))
 #agregate input functions
-#####
-ReadAggregateFile<-function(file, species, timepoint, condition, replicate){#make a dataframe of the aggregate size list and add experimental parameters
+ReadAggregateFile<-function(file, species, timepoint, condition, replicate, sampleCode){#make a dataframe of the aggregate size list and add experimental parameters
   print(file)
    datos <-read.csv(file, header = F)  
    colnames(datos)<-c('Size') 
@@ -35,13 +46,13 @@ ReadAggregateFile<-function(file, species, timepoint, condition, replicate){#mak
    datos<-datos %>% mutate(TimePoint = timepoint) 
    datos<-datos %>% mutate(Condition = condition)
    datos<-datos %>% mutate(Replicate = replicate)
+   datos<-datos %>% mutate(SampleCode = sampleCode)
    datos$Species<-as.factor(datos$Species)
    datos$Replicate<-as.factor(datos$Replicate)
    datos$Condition<-as.factor(datos$Condition)
    datos$TimePoint<-as.factor(datos$TimePoint)
    return(datos)
 }
-
 GetAggregates<-function(){#import all experiments at once
    folder<- paste0('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists')
    fileList<-list.files(path = folder, full.names = TRUE)
@@ -49,12 +60,12 @@ GetAggregates<-function(){#import all experiments at once
    for (aggList in 1:length(fileList)){
      fileName<-str_split(basename(fileList[aggList]), "\\.")[[1]][1]#this selects the base file name and removes the ".csv"
      attrList<-str_split(fileName,"_")[[1]]
-     growthDf<-rbind(growthDf,ReadAggregateFile(fileList[aggList],attrList[4],attrList[2],attrList[1],attrList[3]))
+     growthDf<-rbind(growthDf,ReadAggregateFile(fileList[aggList],attrList[4],attrList[2],attrList[1],attrList[3], fileName))
      }
    return(growthDf)
 }
-#####
 ```
+
 ```{r aggregate wrangling and overview plots}
 #Statistics from all aggregates
 
@@ -65,17 +76,24 @@ aggregateListSummaryReplicate<-aggregateList%>% group_by(Species, TimePoint, Con
 
 #Plot agg summary per sample
 #####
+
 ggplot()+ 
-  geom_jitter(data = aggregateListSummaryReplicate, aes(x = TimePoint, y= meanAggSize, color = Species,shape = "MeanSize"),size = 3, height = 0, width = .1)+
-  geom_jitter(data = aggregateListSummaryReplicate, aes(x = TimePoint, y= maxSize, color = Species, shape = "MaxSize"),size = 3, height = 0, width = .1)+
-  geom_jitter(data = aggregateListSummaryReplicate, aes(x = TimePoint, y= biomass, color = Species, shape = "TotalBiomass"),size = 3, height = 0, width = .1)+  
+  geom_jitter(data = aggregateListSummaryReplicate, aes(x = TimePoint, y= meanAggSize, color = Condition,shape = "MeanSize"),size = 3, height = 0, width = .3)+
+  geom_jitter(data = aggregateListSummaryReplicate, aes(x = TimePoint, y= maxSize, color = Condition, shape = "MaxSize"),size = 3, height = 0, width = .3)+
+  geom_jitter(data = aggregateListSummaryReplicate, aes(x = TimePoint, y= biomass, color = Condition, shape = "TotalBiomass"),size = 3, height = 0,width= .3)+
   scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
-  facet_grid(. ~ Condition, scales = "free", space = "free") +
+  facet_grid(.~Species, scales = "free", space = "free") +
   ggtitle('Mean size and largest aggregate and total biomass per sample')+
   labs(x = "",y = bquote(paste("Volume (", mu*"m"^3*")")))+
   scale_shape_manual(name="Metric",values=c(MeanSize=1, MaxSize=2, TotalBiomass=17))+
+  scale_color_brewer(palette = "Set1")+
   theme_cowplot()+
-  theme(plot.title = element_text(hjust = 0.5))
+  panel_border() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
+        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
+
+
 #####
 
 #Get aggregate Summary per condition
@@ -84,20 +102,23 @@ aggregateListSummary<-aggregateList %>% group_by(Species, TimePoint, Condition) 
   ungroup() %>% mutate(RatioMaxTotal = maxSize/biomass ) 
 #plot agg summary per condition
 #####
-ggplot()+
-  geom_jitter(data = aggregateListSummary, aes(x = TimePoint, y= meanAggSize, color = Species,shape = "MeanSize"),size = 3, height = 0, width = .1)+
-  geom_jitter(data = aggregateListSummary, aes(x = TimePoint, y= maxSize, color = Species, shape = "MaxSize"),size = 3, height = 0, width = .1)+
-  geom_jitter(data = aggregateListSummary, aes(x = TimePoint, y= biomass, color = Species, shape = "TotalBiomass"),size = 3, height = 0, width = .1)+ 
+ggplot()+ 
+  geom_jitter(data = aggregateListSummary, aes(x = TimePoint, y= meanAggSize, color = Condition,shape = "MeanSize"),size = 3, height = 0, width = .3)+
+  geom_jitter(data = aggregateListSummary, aes(x = TimePoint, y= maxSize, color = Condition, shape = "MaxSize"),size = 3, height = 0, width = .3)+
+  geom_jitter(data = aggregateListSummary, aes(x = TimePoint, y= biomass, color = Condition, shape = "TotalBiomass"),size = 3, height = 0,width= .3)+
   scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
-  facet_grid(. ~ Condition, scales = "free", space = "free") +
-  ggtitle('Mean size and largest aggregate and total biomass per sample')+
+  facet_grid(. ~ Species, scales = "free", space = "free") +
+  ggtitle('Mean size and largest aggregate and total biomass per condition')+
   labs(x = "",y = bquote(paste("Volume (", mu*"m"^3*")")))+
   scale_shape_manual(name="Metric",values=c(MeanSize=1, MaxSize=2, TotalBiomass=17))+
+  scale_color_brewer(palette = "Set1")+
   theme_cowplot()+
-  theme(plot.title = element_text(hjust = 0.5))
+  theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facets
+          strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))
 #####
 ```
-```{r non-fancy histogram}
+
+```{r Aggregate size bins}
 #histogram<- hist(aggregateList$Size, breaks = c(0, 5, 10, 100, 1000, 10^9))#this is a simple way to do a histogram
 
 #this pipe essentially gets to the product of what fancy histograms do but more efficiently
@@ -143,14 +164,18 @@ HistConditionSummary<-HistCondition %>%
 #this isn't useful as the normalized Frequency changes with replicate, so it's better to pool all samples together
 PlotHistSum<-function(rep.df,cond.df, y_var, title){
 ggplot()+
-    geom_jitter(data = HistReplicateSummary,aes(x=as.factor(LogBin),y=.data[[y_var]],  color =Species ),size=3, height = 0, width = .2, shape = 1)+
-    geom_point(data = HistConditionSummary,aes(x=as.factor(LogBin),y=.data[[y_var]],  color =Species,group = Species),size=4, shape = 16, position = position_dodge(width = .3) )+
+    geom_jitter(data = HistReplicateSummary,aes(x=as.factor(LogBin),y=.data[[y_var]],  color =Condition ),size=3, height = 0, width = .2, shape = 1)+
+    geom_point(data = HistConditionSummary,aes(x=as.factor(LogBin),y=.data[[y_var]],  color =Condition,group = Condition),size=4, shape = 16, position = position_dodge(width = .5) )+
     scale_y_log10(breaks = c(100, 10, 1, .1, .01), labels = c(100, 10, 1, .1, .01))+
-    facet_grid(Condition~TimePoint)+
+    facet_grid(Species~TimePoint)+
     ggtitle(title)+
     labs(y = paste(y_var,"(%)"),x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    scale_color_brewer(palette = "Set1")+
     theme_cowplot()+
-    theme(plot.title = element_text(hjust = 0.5))
+    panel_border() +
+    theme(plot.title = element_text(hjust = 0.5), 
+        strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
+        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
 }
 
 PlotHistSum(HistReplicateSummary,HistConditionSummary,"NormalizedFrequency", "Normalized Frequency all sizes")
@@ -168,10 +193,10 @@ ggplot()+
     ggtitle(paste('Normalized Biomass per Sample', species))+
     theme_cowplot()+
     scale_colour_grey()+
+    panel_border() +
     theme(plot.title = element_text(hjust = 0.5)) }
-PlotHistRepBioTrend(HistReplicateSummary, "Pa")
-PlotHistRepBioTrend(HistReplicateSummary, "Sa")
-
+PlotHistRepBioTrend(HistReplicateSummary, "P. aeruginosa")
+PlotHistRepBioTrend(HistReplicateSummary, "S. aureus")
 
 #####
 #now only aggregates 5 microns or larger
@@ -204,15 +229,15 @@ aggsHistCond<-aggregateList %>% mutate(LogBin = case_when(Size <= 5 ~ 5,
   mutate(NormalizedFrequency = BinFrequency/TotalFrequency*100, NormalizedBiomass = BinBiomass/TotalBiomass*100)
 
 ##Summary df
-aggsHistCondSum<-aggsHistCond %>% group_by(Species,Condition,TimePoint, Replicate, LogBin,NormalizedFrequency,NormalizedBiomass) %>% summarize() %>%  unique()%>%ungroup() %>%  group_by(Species,Condition,TimePoint, Replicate) %>% mutate(checkSumFreq =sum(NormalizedFrequency), checkSumBiomass = sum(NormalizedBiomass))
+aggsHistCondSum<-aggsHistCond %>% group_by(Species,Condition,TimePoint, Replicate, LogBin,NormalizedFrequency,NormalizedBiomass) %>% summarize() %>%  unique()%>%ungroup() %>%  group_by(Species,Condition,TimePoint, Replicate) %>% mutate(checkSumFreq =sum(NormalizedFrequency), checkSumBiomass = sum(NormalizedBiomass))%>%ungroup()
 
 #now plot it
 #normalized frequency
 
 PlotHistSum(aggsHistRepSum,aggsHistCondSum,"NormalizedFrequency", "Normalized Frequency aggregates only")
 PlotHistSum(aggsHistRepSum,aggsHistCondSum,"NormalizedBiomass","Normalized Biomass aggregates only")
-PlotHistRepBioTrend(aggsHistRepSum, "Pa")
-PlotHistRepBioTrend(aggsHistRepSum, "Sa")
+PlotHistRepBioTrend(aggsHistRepSum, "P. aeruginosa")
+PlotHistRepBioTrend(aggsHistRepSum, "S. aureus")
 
 #####
 #Planktonic vs aggregates
@@ -236,25 +261,26 @@ plankAggHistCond<-HistCondition %>% group_by(Species,Condition,TimePoint, Aggreg
 
 #Plot Frequency
 ggplot()+
-  geom_jitter(data = plankAggHistRep,aes(x=as.factor(Aggregation),y=AgPlNormFrequency,  color =Species, ),size=3, height = 0, width = .2, shape = 1)+ 
-  geom_point(data = plankAggHistCond,aes(x=as.factor(Aggregation),y=AgPlNormFrequency,  color =Species,group = Species),size=4, shape = 16, position = position_dodge(width = .3) )+
-  facet_grid(Condition~TimePoint)+
+  geom_jitter(data = plankAggHistRep,aes(x=as.factor(Aggregation),y=AgPlNormFrequency,  color =Condition ),size=3, height = 0, width = .2, shape = 1)+ 
+  geom_point(data = plankAggHistCond,aes(x=as.factor(Aggregation),y=AgPlNormFrequency,  color =Condition,group = Condition),size=4, shape = 16, position = position_dodge(width = .3) )+
+  facet_grid(Species~TimePoint)+
   ggtitle("Normalized Frequency (%) Aggs vs Plank")+
   labs(y = "Normalized Frequency (%)",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
   theme_half_open()+
   panel_border() +
-  #background_grid(major = "y")+
+  scale_color_brewer(palette = "Set1")+
   theme(plot.title = element_text(hjust = 0.5)) 
 #Plot Biomass
 ggplot()+
-    geom_jitter(data = plankAggHistRep,aes(x=as.factor(Aggregation),y=AgPlNormBiomass,  color =Condition ),size=2, height = 0, width = .2, shape = 1)+
-  geom_jitter(data = plankAggHistCond,aes(x=as.factor(Aggregation),y=AgPlNormBiomass,  color =Condition,group = Species),size=5, shape = 16,height = 0, width = .2) +
-    facet_grid(Species~TimePoint)+
+  geom_jitter(data = plankAggHistRep,aes(x=as.factor(Aggregation),y=AgPlNormBiomass,  color =Condition ),size=2, height = 0, width = .2, shape = 1)+
+  geom_point(data = plankAggHistCond,aes(x=as.factor(Aggregation),y=AgPlNormBiomass,  color =Condition),size=5, shape = 16, position = position_dodge2(width = .5)) +
+  facet_grid(Species~TimePoint)+
   ggtitle("Normalized Biomass (%) Aggs vs Plank")+
-    labs(y = "Normalized Biomass (%)",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+  scale_color_manual( values = c( "red","blue","green", "gray"),labels = c("Sa Mono", "phz co", "pqsL co", "wt co"))+
-    theme_cowplot()+
-    panel_border() +
-    theme(plot.title = element_text(hjust = 0.5)) 
+  labs(y = "Normalized Biomass (%)",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+ 
+  theme_cowplot()+
+  panel_border() +
+  scale_color_brewer(palette = "Set1")+
+  theme(plot.title = element_text(hjust = 0.3)) 
 #####
 ```
 
@@ -262,18 +288,18 @@ ggplot()+
 #Biomass contribution of Planktonic vs Aggregates
 #####
 #Collapse dataframe to values per condition
-plankAggHistSummary<-plankAggHist %>% group_by(Species,TimePoint, Condition,Aggregation) %>%
+plankAggHistSummary<-plankAggHistRep %>% group_by(Species,TimePoint, Condition,Aggregation) %>%
   summarise(MeanFreq = mean(AgPlNormFrequency), SEFreq = std.error(AgPlNormFrequency), MeanBiomass = mean(AgPlNormBiomass),
             SEBiomass = std.error(AgPlNormBiomass))
 #Plot using the code from the paper
 ggplot()+
-  geom_col(data = plankAggHistSummary,aes(x=Aggregation,y=MeanBiomass, fill = TimePoint),
+  geom_col(data = plankAggHistSummary %>% filter(Aggregation=="Aggregate"),aes(x=Aggregation,y=MeanBiomass, fill = Condition),
            size=3,position = position_dodge( width = .9))+
-  geom_jitter(data = plankAggHist,aes(x=Aggregation,y=AgPlNormBiomass, group = TimePoint),shape = 1,size=2,position = position_dodge(width = .9),show.legend = FALSE)+
-  geom_errorbar(data = plankAggHistSummary,aes(x=Aggregation,ymin=(MeanBiomass-SEBiomass), ymax = (MeanBiomass+SEBiomass), group = TimePoint),width = 0, size=.5,position = position_dodge(width = .9))+
+  geom_jitter(data = plankAggHistRep%>% filter(Aggregation=="Aggregate"),aes(x=Aggregation,y=AgPlNormBiomass, group = Condition),shape = 1,size=2,position = position_dodge(width = .9),show.legend = FALSE)+
+  geom_errorbar(data = plankAggHistSummary%>% filter(Aggregation=="Aggregate"),aes(x=Aggregation,ymin=(MeanBiomass-SEBiomass), ymax = (MeanBiomass+SEBiomass), group = Condition),width = 0, size=.5,position = position_dodge(width = .9))+
   scale_y_continuous(limits = c(0,103),expand = expand_scale(mult = c(0, 0)))+
-  facet_grid(.~Species)+
-  scale_fill_grey()+
+  facet_grid(TimePoint~Species)+
+  scale_fill_brewer(palette = "Set1")+
   labs(title = '', x = "", y = "Biomass contribution (%)")+
   theme_cowplot()+
   theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
@@ -281,25 +307,25 @@ ggplot()+
         axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(margin = margin(1,0,0,0),size=13),
         axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,2,0),size=11),
         legend.title = element_text(size=13),legend.text = element_text(size = 11),
-          legend.position = c(0.79, 0.60))
+        legend.position = c(.45, 0.60))
 #####
 #Normalized Frequency and Biomass contribution of Aggregate bins
 #####
 #Collapse to data per condition
-AggsOnlySummary<-aggsOnlyHistSummary.df %>% group_by(Species,TimePoint, Condition,LogBin) %>%
+AggsOnlySummary<-aggsHistRepSum %>% group_by(Species,TimePoint, Condition,LogBin) %>%
   summarise(MeanFreq = mean(NormalizedFrequency), SEFreq = std.error(NormalizedFrequency), MeanBiomass = mean(NormalizedBiomass),
             SEBiomass = std.error(NormalizedBiomass))
 #Plot Frequency using code from the paper
 ggplot()+
-    geom_col(data = AggsOnlySummary, aes(x=as.factor(LogBin),y=MeanFreq,  fill =TimePoint ),size=4,position = position_dodge( width = .9))+
-    geom_jitter(data = aggsOnlyHistSummary.df, aes(x=as.factor(LogBin),y=NormalizedFrequency, group = TimePoint),shape = 1,size=2,position = position_dodge( width = .9))+
-    geom_errorbar(data = AggsOnlySummary,aes(x=as.factor(LogBin),ymin=(MeanFreq-SEFreq), ymax = (MeanFreq+SEFreq), group = TimePoint),width = 0, size= .5,position = position_dodge( width = .9))+
-    facet_grid(.~Species)+
-    labs(fill = "",y = "Aggregates per bin (% of total)",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    geom_col(data = AggsOnlySummary, aes(x=as.factor(LogBin),y=MeanFreq,  fill =Condition ),size=4,position = position_dodge( width = .9))+
+    geom_jitter(data = aggsHistRepSum, aes(x=as.factor(LogBin),y=NormalizedFrequency, group = Condition),shape = 1,size=2,position = position_dodge( width = .9))+
+    geom_errorbar(data = AggsOnlySummary,aes(x=as.factor(LogBin),ymin=(MeanFreq-SEFreq), ymax = (MeanFreq+SEFreq), group = Condition),width = 0, size= .5,position = position_dodge( width = .9))+
+    facet_grid(TimePoint~Species)+
+    labs(fill = "",y = "Aggregates Frequency per bin (% of total)",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
     #guides(color = FALSE)+
-    scale_y_continuous(limits = c(0,70), expand = expand_scale(mult = c(0, 0)))+
-    scale_fill_grey()+
+    #scale_y_continuous(limits = c(0,180), expand = expand_scale(mult = c(0, 0)))+
     theme_half_open()+
+    scale_fill_brewer(palette = "Set1")+
     theme(plot.title = element_text(hjust = 0.5),
           strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facets
           strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
@@ -307,17 +333,20 @@ ggplot()+
           axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(margin = margin(1,0,0,0),size=11),
           axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,2,2,0),size=11),
           legend.title = element_text(size=13),legend.text = element_text(size = 11),
-          legend.position = c(0.79, 0.60))
+          legend.position = c(0.79, 0.80))
 #Plot Normalized Biomass
+AggsOnlySummaryRep<-aggsHistRepSum %>% group_by(Species,TimePoint, Replicate, Condition,LogBin) %>%
+  summarise(MeanFreq = mean(NormalizedFrequency), SEFreq = std.error(NormalizedFrequency), MeanBiomass = mean(NormalizedBiomass),
+            SEBiomass = std.error(NormalizedBiomass))
 ggplot()+
-    geom_col(data = AggsOnlySummary, aes(x=as.factor(LogBin),y=MeanBiomass,  fill =TimePoint ),size=4,position = position_dodge( width = .9))+
+    geom_col(data = AggsOnlySummary, aes(x=as.factor(LogBin),y=MeanBiomass,  fill =Condition ),size=4,position = position_dodge( width = .9))+
     #geom_jitter(data = aggsOnlyHistSummary.df, aes(x=as.factor(LogBin),y=NormalizedBiomass, group = TimePoint),shape = 1,size=2,position = position_dodge( width = .9))+
-    geom_errorbar(data = AggsOnlySummary,aes(x=as.factor(LogBin),ymin=(MeanBiomass-SEBiomass), ymax = (MeanBiomass+SEBiomass), group = TimePoint),width = 0, size= .5,position = position_dodge( width = .9))+
-    facet_grid(.~Species)+
-    labs(fill = "",y = "Aggregates per bin (% of total)",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    geom_errorbar(data = AggsOnlySummary,aes(x=as.factor(LogBin),ymin=(MeanBiomass-SEBiomass), ymax = (MeanBiomass+SEBiomass), group = Condition),width = 0, size= .5,position = position_dodge( width = .9))+
+    facet_grid(TimePoint~Species)+
+    labs(fill = "",y = "Biomass contribution per bin (% of total)",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
     #guides(color = FALSE)+
     scale_y_continuous(limits = c(0,100), expand = expand_scale(mult = c(0, 0)))+
-    scale_fill_grey()+
+    scale_fill_brewer(palette = "Set1")+
     theme_half_open()+
     theme(plot.title = element_text(hjust = 0.5),
           strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facets
@@ -326,9 +355,10 @@ ggplot()+
           axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(margin = margin(1,0,0,0),size=11),
           axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,2,2,0),size=11),
           legend.title = element_text(size=13),legend.text = element_text(size = 11),
-          legend.position = c(0.79, 0.60))
+          legend.position = c(0.79, 0.80))
 #####
 ```
+
 ```{r fancy histogram of aggregates !!!deprecated}
 #Create histograms
 ##this takes a long time, so consider running them in parts
@@ -481,4 +511,8 @@ TotalFancyHistogram<-function(df,binsize){
   histogram%>%mutate(Sample=df$Sample[1])->histogram
   return(histogram)
 }
+```
+```{r Test color palettes}
+library(RColorBrewer)
+brewer.pal(n = 4, name = 'Set1')
 ```
