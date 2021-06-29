@@ -457,31 +457,60 @@ ReadSliceFile<-function(file, timepoint, condition, replicate, sampleCode){#make
    return(datos)
 }
 
+#Input data
+#####
+#get data from csv file
 slicedData<-GetSliceData()
-
-#merge with metadata
+#get metadata
 metaData.df <-read.csv('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/image data copy.csv', header = TRUE)
-
+#merge files
 metaData.df<-metaData.df %>% select(SampleCode, mouse, Position, size, Voxel.size,Region, Zdim)
 sliceDataMeta<-metaData.df %>%  merge(slicedData, by = "SampleCode")
+#clean up
 remove <- sliceDataMeta %>% filter(Channel == 2 & Condition == "mono")
 sliceDataMeta <- anti_join(sliceDataMeta, remove)
-
+#rename variables
 sliceDataMeta$Channel <- factor(sliceDataMeta$Channel, levels = c(1, 2, 3),labels = c('S. aureus','P. aeruginosa','host'))
-sliceDataMeta<-sliceDataMeta %>% mutate(Height = Zdim*Slice)
-sliceDataMeta<-sliceDataMeta %>% group_by(SampleCode, Channel) %>% mutate(TotalBiomass = sum(Biomass)) %>% ungroup() %>% mutate(NormBiomass = Biomass/TotalBiomass*100)
+sliceDataMeta$Condition<- factor(sliceDataMeta$Condition, levels = c("mono", "wt", "pqsL", "phz"),labels = c('Sa mono','wt co', 'pqsL co', 'phz co'))
+sliceDataMeta$TimePoint <- factor(sliceDataMeta$TimePoint, levels = c("d1", "d4"),labels = c('Day 1','Day 4'))
+#calculate relative biomass
+sliceDataMeta<-sliceDataMeta%>% filter(!Channel == "host") %>% mutate(Height = Zdim*Slice) %>% group_by(SampleCode, Channel) %>% mutate(TotalBiomass = sum(Biomass)) %>% ungroup() %>% mutate(NormBiomass = Biomass/TotalBiomass*100) 
 
-
+#####
+#Plot Data
+#####
 ggplot()+
-  geom_point(data = sliceDataMeta,aes(x=NormBiomass,y=Height, color = Condition, shape = TimePoint ),size=2)+
-  
+  #geom_point(data = sliceDataMeta ,aes(y=NormBiomass,x=Height, color = Condition, group = Replicate),size=.5)+
+  geom_smooth(data = sliceDataMeta ,aes(y=NormBiomass,x=Height, color = Condition),size=2)+
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray")+
   theme_cowplot()+
   scale_color_brewer(palette = "Set1")+
-  facet_grid(Channel~Condition)+
+  facet_grid(Channel~TimePoint)+
+  panel_border() +
+  coord_flip()
   theme(plot.title = element_text(hjust = 0.5))
+#####
+#Max slice?
+sliceDataMeta<-sliceDataMeta %>% group_by(SampleCode, Condition, Replicate, TimePoint) %>% mutate(MaxHeight = max(Height))
+ggplot()+
+  geom_point(data = maxSlice%>% filter(MaxHeight<120 & MaxHeight>50),aes(x=Replicate,y=MaxHeight, color = Condition),size=4)+
+facet_grid(.~TimePoint, scales = "free", space = "free")+
+  scale_color_brewer(palette = "Set1")+
+  geom_hline(yintercept = 120)+
+  geom_hline(yintercept = 50)+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5),axis.text.x = element_text(angle = 70, hjust = 1))
 
-
-
+ggplot()+
+  #geom_point(data = sliceDataMeta ,aes(y=NormBiomass,x=Height, color = Condition, group = Replicate),size=.5)+
+  geom_smooth(data = sliceDataMeta %>% filter(MaxHeight>50 & MaxHeight<120) ,aes(y=NormBiomass,x=Height, color = Condition),size=2)+
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray")+
+  theme_cowplot()+
+  scale_color_brewer(palette = "Set1")+
+  facet_grid(Channel~TimePoint)+
+  panel_border() +
+  coord_flip()
+  theme(plot.title = element_text(hjust = 0.5))
 
 
 ```
