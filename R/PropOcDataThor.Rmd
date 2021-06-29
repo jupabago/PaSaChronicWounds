@@ -1,0 +1,78 @@
+---
+title: "Proportional Occupancy"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+library(pixmap)
+library(rtiff)
+library(reshape2)
+library(gplots)
+library(gdata)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(cowplot)
+library(tidyr)
+library(purrr)
+library(plotrix)
+library(ggsignif)
+library(rdist)
+
+```
+
+```{r functions to get data}
+#using the new 3D script with capped spheres.
+source('/home/jbarraza6/Documents/RScripts/PropOcFunctions2.0.R') 
+GetPropOcData<-function(sample, timepoints, positions){
+  #folder<- paste0('/media/jbarraza6/Seagate Backup Plus Drive/Good images/',sample,'/images1')
+  folder<- paste0('~/Desktop/Seagate Backup Plus Drive/Good images/',sample,'/imagesSubtractRed1')
+  growthDf<-data.frame()#data frame to add all timepoints and positions
+  fileList<-list.files(path = folder, full.names = TRUE)
+  print(folder)
+  for (position in 2:positions){
+    currentPosition<-fileList[grep(paste0("p",position,"_"),fileList)]
+    print(paste0('analyzing position ', position))
+    for (timepoint in 0:timepoints){
+      currentTimePoint<-currentPosition[grep(paste0("t",GetSlice(timepoint),"_"),currentPosition)]
+      dataTimePoint<-AllDataPipeline(SlicesTo3D(currentTimePoint,"red"),SlicesTo3D(currentTimePoint,"green"), 
+                                     xydimSearch=114,zdimSearch = 70, sampleSize=1000,xyRealDim=0.264,
+                                     zRealDim = 0.44, pipeBinSize = 1)
+      dataTimePoint$TimePoint <- timepoint
+      dataTimePoint$Position <- position
+      growthDf<-rbind(growthDf,dataTimePoint)
+      }
+    }
+  return(growthDf)
+  }
+GetSlice<-function(idx){
+  if (idx<10){num = paste0(0,idx)}
+  else
+  {num = idx}
+  return(num)}
+```
+
+```{r running functions}
+wt1.1000<-GetPropOcData("3-13-19", 6, 2)
+write.csv(wt1.1000, "~/Desktop/Seagate Backup Plus Drive/Good images/PropOcDataAll/wt1-1000-3.csv")
+
+wt2.1000<-GetPropOcData("3-19-19", 6, 2)
+write.csv(wt2.1000, "~/Desktop/Seagate Backup Plus Drive/Good images/PropOcDataAll/wt2-1000-3.csv")
+
+wt3.1000<-GetPropOcData("4-17-19", 6, 2)
+write.csv(wt3.1000, "~/Desktop/Seagate Backup Plus Drive/Good images/PropOcDataAll/wt3-1000-3.csv")
+
+
+mut1.1000<-GetPropOcData("4-24-19", 6, 2)
+write.csv(mut1.1000, "~/Desktop/Seagate Backup Plus Drive/Good images/PropOcDataAll/mut1-1000-3.csv")
+
+mut2.1000<-GetPropOcData("4-25-19", 6, 2)
+write.csv(mut2.1000, "~/Desktop/Seagate Backup Plus Drive/Good images/PropOcDataAll/mut2-1000-3.csv")
+mut3.1000<-GetPropOcData("5-8-19", 6, 2)
+write.csv(mut3.1000, "~/Desktop/Seagate Backup Plus Drive/Good images/PropOcDataAll/mut3-1000-3.csv")
+
+
+
+```
