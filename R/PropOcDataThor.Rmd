@@ -26,9 +26,9 @@ library(rdist)
 ```{r functions to get data}
 #using the new 3D script with capped spheres.
 source('/home/jbarraza6/Documents/RScripts/PropOcFunctions2.0.R') 
+source('/Users/jupabago/Documents/Whiteley/PROJECTS/Rpackage/PropOc Package/R/PropOcFunctions2.0.R') 
 GetPropOcData<-function(sample, timepoints, positions){
-  #folder<- paste0('/media/jbarraza6/Seagate Backup Plus Drive/Good images/',sample,'/images1')
-  folder<- paste0('~/Desktop/Seagate Backup Plus Drive/Good images/',sample,'/imagesSubtractRed1')
+  folder<- paste0('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists')
   growthDf<-data.frame()#data frame to add all timepoints and positions
   fileList<-list.files(path = folder, full.names = TRUE)
   print(folder)
@@ -37,21 +37,62 @@ GetPropOcData<-function(sample, timepoints, positions){
     print(paste0('analyzing position ', position))
     for (timepoint in 0:timepoints){
       currentTimePoint<-currentPosition[grep(paste0("t",GetSlice(timepoint),"_"),currentPosition)]
-      dataTimePoint<-AllDataPipeline(SlicesTo3D(currentTimePoint,"red"),SlicesTo3D(currentTimePoint,"green"), 
-                                     xydimSearch=114,zdimSearch = 70, sampleSize=1000,xyRealDim=0.264,
+      dataTimePoint<-AllDataPipeline(SlicesTo3D(redVolume),SlicesTo3D(greenVolume), 
+                                     xydimSearch=114,zdimSearch = 70,
+                                     sampleSize=1000,xyRealDim=0.264,
                                      zRealDim = 0.44, pipeBinSize = 1)
-      dataTimePoint$TimePoint <- timepoint
-      dataTimePoint$Position <- position
+      dataTimePoint$Condition <- 
+      dataTimePoint$TimePoint <- 
       growthDf<-rbind(growthDf,dataTimePoint)
       }
     }
   return(growthDf)
-  }
+}
+
+GetPropOcData<-function(sampleName, xyDim,zDim){
+  parentFolder<- '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/'
+  sampleFolder<-paste0(parentFolder, sampleName)
+  attrList<-str_split(sampleName,"_")[[1]]
+  fileList<-list.files(path = sampleFolder, full.names = TRUE)
+  greenImg<-fileList[grep("G_",fileList)]
+  redImg<-fileList[grep("R_",fileList)]
+  propOcData<-AllDataPipeline(SlicesTo3D(redImg),SlicesTo3D(greenImg), 
+                                     xydimSearch=round(30/xyDim),zdimSearch =round(30/zDim),
+                                     sampleSize=10,xyRealDim=xyDim,
+                                     zRealDim = zDim, pipeBinSize = 1)
+  propOcData$Condition <- attrList[1]
+  propOcData$TimePoint <- attrList[2]
+  propOcData$Replicate <- attrList[3]
+  write.csv(propOcData, paste0("/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/PropOc Data/",sampleName,".csv"))
+}
+
+testGetPropOcData<-GetPropOcData("mono_d1_01", .415,.52)
+testPmap<-pmap(list(metaData.df$SampleCode, metaData.df$xyDim, metaData.df$Zdim),GetPropOcData)
+boundPmapTest<-bind_rows(testPmap)
+
+
+testGrep<-list.files(path = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/mono_d1_02', full.names = TRUE)
+testGrepG<-testGrep[grep("G_",testGrep)]
+
 GetSlice<-function(idx){
   if (idx<10){num = paste0(0,idx)}
   else
   {num = idx}
   return(num)}
+
+Slices2threeD<-function(fileList){
+  image1<-as.array(readImage(fileList[1], convert = TRUE))#read first image to get its dimensions
+  image3D <- array(0, c(dim(image1)[1], dim(image1)[2], length(fileList)))#preallocate array for image given using image dimensions
+  for(i in 1:length(fileList)){#keep in mind that it is not zero-index
+    #print(paste("loading ch1...", i, "/", length(filesList), filesList[i]))
+    image3D[,,i]<-as.array(readImage(fileList[i], convert = TRUE))
+  }
+  return(image3D)
+}
+testSlices2threeD<-Slices2threeD(testGrepG)
+testGrepG[1]
+testImage1<-as.array(readImage(testGrepG[1], convert = TRUE))
+
 ```
 
 ```{r running functions}
@@ -64,7 +105,6 @@ write.csv(wt2.1000, "~/Desktop/Seagate Backup Plus Drive/Good images/PropOcDataA
 wt3.1000<-GetPropOcData("4-17-19", 6, 2)
 write.csv(wt3.1000, "~/Desktop/Seagate Backup Plus Drive/Good images/PropOcDataAll/wt3-1000-3.csv")
 
-
 mut1.1000<-GetPropOcData("4-24-19", 6, 2)
 write.csv(mut1.1000, "~/Desktop/Seagate Backup Plus Drive/Good images/PropOcDataAll/mut1-1000-3.csv")
 
@@ -72,7 +112,5 @@ mut2.1000<-GetPropOcData("4-25-19", 6, 2)
 write.csv(mut2.1000, "~/Desktop/Seagate Backup Plus Drive/Good images/PropOcDataAll/mut2-1000-3.csv")
 mut3.1000<-GetPropOcData("5-8-19", 6, 2)
 write.csv(mut3.1000, "~/Desktop/Seagate Backup Plus Drive/Good images/PropOcDataAll/mut3-1000-3.csv")
-
-
 
 ```
