@@ -1,0 +1,90 @@
+﻿Code Name,Tiff,File Name,Date imaged,mouse,Position,size,Voxel size,Region,Zdim,notes,xyDim
+mono_d1_02,Yes,image 14_Stitch.czi,20-Oct-20,1,2,638x638x90.6,.415x.415x.52,core,0.52,,0.415
+mono_d1_01,Yes,image 13.czi,20-Oct-20,1,1,213x213x69.7,.415x.415x.52,core,0.52,,0.415
+mono_d1_03,Yes,mono day 1 mouse 1 position 1_Stitch,28-Jan-21,1,1,595x595x238,.208x.208x.52,edge,0.52,"imaged 14 hrs after harvest, bad quality",0.208
+mono_d1_04,Yes,mono day 1 mouse 1 position 2_Stitch,28-Jan-21,1,2,595x595x138,.208x.208x.52,core,0.52,doesnt look as bad as first position,0.208
+mono_d1_05,Yes,mono day 1 mouse 1 position 3_Stitch,28-Jan-21,1,3,595x595x69.7,.208x.208x.52,edge,0.52,significant green bleed ,0.208
+mono_d1_06,Yes,mono day 1 mouse 2 position 1_Stitch,28-Jan-21,2,1,786x786x65,.208x.208x.52,edge,0.52,smaller aggregates,0.208
+mono_d1_07,Yes,mono day 1 mouse 2 position 2_Stitch,28-Jan-21,2,2,786x786x108,.208x.208x.52,core,0.52,lots of cells,0.208
+mono_d1_08,Yes,mono day 1 mouse 2 position 3_Stitch,28-Jan-21,2,3,786x786x55.7,.208x.208x.52,edge,0.52,,0.208
+mono_d1_09,Yes,mouse 1 position 1_Stitich,12-Mar-21,1,1,787x787x20,.208x.208x.365,core,0.365,heavy overlap in blue and red,0.208
+mono_d1_10,Yes,mouse 1 position 2_Stitich,12-Mar-21,1,2,595x595x29.6,.208x.208x.365,core,0.365,"blue-red overlap, very few cells",0.208
+mono_d1_11,Yes,mouse 1 position 3_Stitich,12-Mar-21,1,3,787x787x18.6,.208x.208x.365,edge,0.365,"can see edge of tissue, but very few bugs",0.208
+mono_d1_12,Yes,mouse 2 position 1_Stitich,12-Mar-21,2,1,595x595x23,.208x.208x.365,edge,0.365,"blue-red overlap, very few cells",0.208
+mono_d1_13,Yes,mouse 2 position 2_Stitich,12-Mar-21,2,2,786x786x25.2,.208x.208x.365,core,0.365,a lot of green fluorescence where it shouldnt be,0.208
+mono_d1_14,Yes,mouse 2 position 3_Stitich,12-Mar-21,2,3,787x787x24.4,.208x.208x.365,edge,0.365,more cells than in previous areas,0.208
+mono_d1_15,Yes,mouse 2 position 4_Stitich,12-Mar-21,2,4,787x787x24.8,.208x.208x.365,edge,0.365,intermediate amount of cells,0.208
+mono_d4_01,Yes,image 8_Stitch.czi,19-Oct-20,1,1,595x595x88,.415x.415x.52,core,0.52,,0.415
+mono_d4_02,Yes,image 10.czi,19-Oct-20,1,2,231x213x47.9,.415x.415x.52,edge,0.52,,0.415
+mono_d4_03,Yes,image 11.czi,19-Oct-20,1,3,213x213x61.4,.415x.415x.52,edge,0.52,,0.415
+mono_d4_04,Yes,image 13_Stitch,19-Oct-20,2,1,595x595x31.2,.415x.415x.52,core,0.52,,0.415
+mono_d4_05,Yes,image 15.czi,19-Oct-20,2,2,213x213x69.7,.415x.415x.52,core,0.52,,0.415
+papqsL_d4_01,No,pqsL_2021_05_25__21_50_18_Stitch,25-May-21,3,1,378x378x37.9,.132x.132x.361,edge,0.361,blue overlap with red,0.132
+phz_d1_01,Yes,Image 11 Block 1_Stitch.czi,9-Nov-20,1,1,595x595x70.8,.415x.415x.52,edge,0.52,,0.415
+phz_d1_02,Yes,Image 11 Block 2_Stitch.czi,9-Nov-20,1,2,595x595x86.4,.415x.415x.52,edge,0.52,,0.415
+phz_d1_03,Yes,Image 11 Block 3_Stitch.czi,9-Nov-20,1,3,598x595x34.3,.415x.415x.52,core,0.52,,0.415
+phz_d1_04,Yes,Image 11 Block 4_Stitch.czi,9-Nov-20,1,4,595x595x67,.415x.415x.52,core,0.52,,0.415
+phz_d1_05,Yes,Image 14 Block 1_Stitch.czi,9-Nov-20,2,1,595x595x15,.415x.415x.52,,0.52,,0.415
+phz_d1_06,Yes,Image 14 Block 2_Stitch.czi,9-Nov-20,2,2,405x405x106,.415x.415x.52,,0.52,,0.415
+phz_d1_07,Yes,Image 14 Block 3_Stitch.czi,9-Nov-20,2,3,405x405x61.9,.415x.415x.52,,0.52,,0.415
+phz_d4_01,Yes,Block1_Stitch.czi,12-Nov-20,1,1,595x595x92.6,.208x.208x.52,edge,0.52,Red is really over-exposed ,0.208
+phz_d4_02,Yes,Block2_Stitch.czi,12-Nov-20,1,2,595x595x107,.208x.208x.52,core,0.52,weird green blob,0.208
+phz_d4_03,Yes,Block3_Stitch.czi,12-Nov-20,1,3,595x595x91.1,.208x.208x.52,edge,0.52,25 um gap,0.208
+phz_d4_04,Yes,mouse2_2020_11_12__22_11_19_Stitch,12-Nov-20,2,1,595x595x68.2,.208x.208x.52,edge,0.52,lots of Pa cells,0.208
+phz_d4_05,Yes,mouse2_2020_11_12__23_26_06_Stitch,12-Nov-20,2,2,595x595x235,.208x.208x.52,core,0.52,really deep,0.208
+phz_d4_06,Yes,mouse2_2020_11_13__05_19_52_Stitch,12-Nov-20,2,3,978x978x16,.208x.208x.52,core,0.52,wide and shallow,0.208
+phz_d4_07,Yes,mouse1-position1 phz co_Stitch,11-Dec-20,1,1,404x404x123,.208x.208x.52,edge,0.52,edge with pseudomonas,0.208
+phz_d4_08,Yes,mouse1-position2 phz co_Stitch,11-Dec-20,1,2,978x404x101,.208x.208x.52,edge,0.52,horizontal tile tryinig to capture the edge with pseudomonas and the core with staph,0.208
+phz_d4_09,Yes,mouse2-position1 phz co_Stitch,11-Dec-20,2,1,595x595x74.9,.208x.208x.52,edge,0.52,close to the edge where you can see some pseudomonas at the bottom and huge aggregates of staph at the top,0.208
+phz_d4_10,Yes,mouse2-position2 phz co_Stitch,11-Dec-20,2,2,404x404x146,.208x.208x.52,core,0.52,"this is closer to the center. you can only see staph, small aggregates at the bottom and then big ones at the top",0.208
+phz_d4_11,Yes,mouse2-position3 phz co_Stitch,11-Dec-20,2,3,404x404x120,.208x.208x.52,edge,0.52,Closer to the edge. pseudomonas at the bottom in planktonic cells with weird central blue structure that has staph at the core,0.208
+phz_d4_12,Yes,mouse3-position1 phz co_Stitch,11-Dec-20,3,1,595x595x247,.208x.208x.52,edge,0.52,Pa and Sa seen clearly and also there is an interface but not segregated,0.208
+phz_d4_13,Yes,mouse3-position2 phz co_Stitch,11-Dec-20,3,2,595x595x111,.208x.208x.52,core,0.52,segregation layer of 31 um,0.208
+phz_d4_14,Yes,mouse3-position3 phz co_Stitch,11-Dec-20,3,3,1169x404x199,.208x.208x.52,edge,0.52,long strip to link edge with core but prematurely stopped,0.208
+pqsL_d4_01,Yes,mouse 1_pos 1_Stitch,8-Dec-20,1,1,595x595x56.2,.208x.208x.52,core,0.52,evenly distributed,0.208
+pqsL_d4_02,Yes,mouse 1_pos 2_Stitch,8-Dec-20,1,2,786x787x20.3,.208x.208x.52,edge,0.52,this isnt very good,0.208
+pqsL_d4_03,Yes,mouse 1_pos 3_Stitch,8-Dec-20,1,3,786x786x27.6,.208x.208x.52,edge,0.52,visible edge of woound,0.208
+pqsL_d4_04,Yes,mouse 2_pos 1_Stitch,8-Dec-20,2,1,595x595x45.3,.208x.208x.52,edge,0.52,"not good either, super drifty",0.208
+pqsL_d4_05,Yes,mouse 2_pos 2_Stitch,8-Dec-20,2,2,404x404x134,.208x.208x.52,edge,0.52,really cool deep image,0.208
+pqsL_d4_06,Yes,mouse 2_pos 3_Stitch,8-Dec-20,2,3,595x595x39,.208x.208x.52,core,0.52,large Staph aggregates,0.208
+pqsL_d4_07,Yes,mouse 3_pos 1_Stitch,8-Dec-20,3,1,595x595x72,.208x.208x.52,edge,0.52,26 um segregation,0.208
+pqsL_d4_08,Yes,mouse 3_pos 2_Stitch,8-Dec-20,3,2,786x786x39,.208x.208x.52,core,0.52,intermixed,0.208
+pqsL_d4_09,Yes,mouse 3_pos 3_Stitch,8-Dec-20,3,3,786x787x20.8,.208x.208x.52,edge,0.52,,
+pqsL_d4_10,Yes,mouse 1 position 1 ,25-Jan-21,1,1,786x787x12,.208x.208x.52,edge,0.52,"nothing across the wound, only few colonies imaged at the very edge and really shallow image. NOT GOOD",
+pqsL_d4_11,Yes,mouse 2 position 1 ,25-Jan-21,2,1,404x404x149,.208x.208x.52,edge,0.52,"wide gap, large Sa aggregates at the top",
+pqsL_d4_12,Yes,mouse 2 position 2,25-Jan-21,2,2,595x595x54,.208x.208x.52,core,0.52,localized host cells,
+pqsL_d4_13,Yes,mouse 2 position 3,25-Jan-21,2,3,595x595x73.9,.208x.208x.52,core,0.52,small aggregates of both,
+pqsL_d4_14,Yes,mouse 3 position 1,25-Jan-21,3,1,595x595x80.1,.208x.208x.52,edge,0.52,suuper weird and super cool. Sa mountain range?,
+pqsL_d4_15,Yes,mouse 3 position 2,25-Jan-21,3,2,595x595x92.6,.208x.208x.52,core,0.52,mostly staph large aggregates,
+pqsL_d4_16,Yes,mouse 3 position 3,25-Jan-21,3,3,786x595x173,.208x.208x.52,edge,0.52,SEGREGATION captures edge and goes a bit inwards capturing the large aggregates that occur at the deep tissue,
+wt_d1_01,Yes,image 1.czi,20-Oct-20,1,1,213x213x83,.415x.415x.52,core,0.52,,
+wt_d1_02,No,image 2_Stitch.czi,20-Oct-20,1,2,638x638x46.8,.415x.415x.52,core,0.52,,
+wt_d1_03,No,image 4_Stitch.czi,20-Oct-20,1,3,638x638x73.9,.415x.415x.52,edge,0.52,,
+wt_d1_04,No,image 5_Stitch.czi,20-Oct-20,2,1,638x638x78.6,.415x.415x.52,edge,0.52,,
+wt_d1_05,No,image 6_Stitch.czi,20-Oct-20,2,2,638x638x65.6,.415x.415x.52,edge,0.52,,
+wt_d1_06,No,image 8,20-Oct-20,2,3,213x213x80,.415x.415x.52,core,0.52,,
+wt_d1_07,No,image 9_Stitch,20-Oct-20,2,4,638x638x24,.415x.415x.52,edge,0.52,really cool localized host cells and bugs,
+wt_d1_08,No,image 10.czi,20-Oct-20,2,5,213x213x53,.415x.415x.52,edge,0.52,,
+wt_d1_09,No,image 12_Stitch.czi,20-Oct-20,2,6,638x638x28,.415x.415x.52,core,0.52,,
+wt_d1_10,No,Image 7 Block 1_Stitch.czi,10-Nov-20,1,1,404x404x82.2,.415x.415x.52,edge,0.52,,
+wt_d1_11,No,Image 7 Block 2_Stitch.czi,10-Nov-20,1,2,787x787x17,.415x.415x.52,edge,0.52,,
+wt_d1_12,No,Image 7 Block 3_Stitch.czi,10-Nov-20,1,3,595x595x81.7,.415x.415x.52,core,0.52,,
+wt_d1_13,No,Image 15 Block 1_Stitch.czi,10-Nov-20,2,1,786x786x28,.415x.415x.52,edge,0.52,,
+wt_d1_14,No,Image 15 Block 2_Stitch.czi,10-Nov-20,2,2,595x595x51,.415x.415x.52,core,0.52,,
+wt_d1_15,No,Image 15 Block 3_Stitch.czi,10-Nov-20,2,3,786x786x28,.415x.415x.52,edge,0.52,,
+wt_d4_01,No,image 2.czi,19-Oct-20,1,1,213x213x106,.415x.415x.52,core,0.52,,
+wt_d4_02,No,Image 3.czi,19-Oct-20,1,2,213x213x106,.415x.415x.52,edge,0.52,,
+wt_d4_03,No,image 4_Stitch.czi,19-Oct-20,1,3,595x595x68,.415x.415x.52,core,0.52,,
+wt_d4_04,No,image 5_Stitch.czi,19-Oct-20,2,1,595x595x90,.415x.415x.52,edge,0.52,,
+wt_d4_05,No,image 6.czi,19-Oct-20,2,2,213x213x60,.415x.415x.52,core,0.52,,
+wt_d4_06,No,image 7.czi,19-Oct-20,2,3,213x213x60,.415x.415x.52,core,0.52,,
+wt_d4_07,Yes,mouse 1 position 1_Stitch,19-Mar-21,1,1,595x595x35.8,.208x.208x.365,core,0.365,"can't use it, xy-shifted red-green",
+wt_d4_08,Yes,mouse 1 position 2_Stitch,19-Mar-21,1,2,404x404x60.6,.208x.208x.365,edge,0.365,"very good, you can see single cells of pa",
+wt_d4_09,Yes,mouse 2 position 1_Stitch,19-Mar-21,2,1,404x404x30.3,.208x.208x.365,core,0.365,green is overexposed and no PA visible,
+wt_d4_10,Yes,mouse 2 position 2_Stitch,19-Mar-21,2,2,595x595x26.3,.208x.208x.365,edge,0.365,red is overexposed and theres a lot of it,
+wt_d4_11,Yes,mouse 2 position 3_Stitch,19-Mar-21,2,3,786x786x10,.208x.208x.365,core,0.365,"I really dont like this one, tissue is brighter than cells",
+wt_d4_12,Yes,mouse 3 position 1_Stitch,19-Mar-21,3,1,601x599x90,.208x.208x.365,edge,0.365,"bleedthrough on red to green, but still good image ",
+wt_d4_13,Yes,mouse 3 position 2_Stitch,19-Mar-21,3,2,595x595x75.9,.208x.208x.365,core,0.365,massive amounts of staph,
+wt_d4_14,Yes,mouse 3 position 3_Stitch,19-Mar-21,3,3,786x786x27.7,.208x.208x.365,edge,0.365,sporadic image with some Pa,
+wt_d4_15,Yes,mouse 3 position 4_Stitch,19-Mar-21,3,4,599x595x52.9,.208x.208x.365,edge,0.365,aggregates of Sa and lots of planktonic Pa,
+wtd_4_16,Yes,mouse 3 position 5_Stitch,19-Mar-21,3,5,595x595x58.7,.208x.208x.365,core,0.365,"28.2 um SEGREGATION, Sa only",
