@@ -21,22 +21,21 @@ library(plotrix)
 library(ggsignif)
 library(rdist)
 library(EBImage)
-
+library(tictoc)
+library(stringr)
 ```
 
 ```{r functions to get data}
 #using the new 3D script with capped spheres.
-source('/home/jbarraza6/Documents/RScripts/PropOcFunctions2.0.R') 
-source('/Users/jupabago/Documents/Whiteley/PROJECTS/Rpackage/PropOc Package/R/PropOcFunctions2.0.R') 
+source('/home/jbarraza6/Documents/RScripts/PropOcFunctions2.0.R') #for Thor
+source('/Users/jupabago/Documents/Whiteley/PROJECTS/Rpackage/PropOc Package/R/PropOcFunctions2.0.R') #for laptop
+
+metaData.df <-read.csv('/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/images metadata.csv', header = TRUE)
 
 GetPropOcData<-function(sampleName, xyDim,zDim){
-<<<<<<< HEAD
-  parentFolder<- '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/'
-=======
   tic()
-  #parentFolder<- '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/'
-  parentFolder<- '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/'
->>>>>>> 846e68104e33a4437d38d15f57ae6cc41659b641
+  parentFolder<- '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/'
+  #parentFolder<- '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/'
   sampleFolder<-paste0(parentFolder, sampleName)
   attrList<-str_split(sampleName,"_")[[1]]
   print(sampleName)
@@ -44,7 +43,6 @@ GetPropOcData<-function(sampleName, xyDim,zDim){
   print(paste("# of files:", length(fileList)))
   if(length(fileList)<1){
     print("empty set")
-    return(data.frame())
   }else{
   greenImg<-fileList[grep("G_",fileList)]
   redImg<-fileList[grep("R_",fileList)]
@@ -55,20 +53,14 @@ GetPropOcData<-function(sampleName, xyDim,zDim){
   propOcData$Condition <- attrList[1]
   propOcData$TimePoint <- attrList[2]
   propOcData$Replicate <- attrList[3]
-<<<<<<< HEAD
-  write.csv(propOcData, paste0("/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Chronic wounds/PropOc Data/",sampleName,".csv"))
-  }
-=======
-  toc()
-  write.csv(propOcData, paste0("/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/PropOc Data/",sampleName,".csv"))
-  return(propOcData)}
+  write.csv(propOcData, paste0("/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/PropOc Data/",sampleName,".csv"))
+  toc()}
   }
 
-testGetPropOcData<-GetPropOcData("mono_d1_02", .415,.52)
->>>>>>> 846e68104e33a4437d38d15f57ae6cc41659b641
-
+testGetPropOcData<-GetPropOcData("wt_d1_02", .415,.52)
 testGetPropOcDataemptyFolder<-GetPropOcData("wt_d1_01", .415,.52)
-testPmap<-pmap(list(metaData.df$SampleCode,metaData.df$xyDim, metaData.df$Zdim),
+
+blah<-pmap(list(metaData.df$SampleCode,metaData.df$xyDim, metaData.df$Zdim),
                GetPropOcData)
 boundPmapTest<-bind_rows(testPmap)
 
