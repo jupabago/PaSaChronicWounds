@@ -27,58 +27,65 @@ library(rdist)
 #using the new 3D script with capped spheres.
 source('/home/jbarraza6/Documents/RScripts/PropOcFunctions2.0.R') 
 source('/Users/jupabago/Documents/Whiteley/PROJECTS/Rpackage/PropOc Package/R/PropOcFunctions2.0.R') 
-GetPropOcData<-function(sample, timepoints, positions){
-  folder<- paste0('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists')
-  growthDf<-data.frame()#data frame to add all timepoints and positions
-  fileList<-list.files(path = folder, full.names = TRUE)
-  print(folder)
-  for (position in 2:positions){
-    currentPosition<-fileList[grep(paste0("p",position,"_"),fileList)]
-    print(paste0('analyzing position ', position))
-    for (timepoint in 0:timepoints){
-      currentTimePoint<-currentPosition[grep(paste0("t",GetSlice(timepoint),"_"),currentPosition)]
-      dataTimePoint<-AllDataPipeline(SlicesTo3D(redVolume),SlicesTo3D(greenVolume), 
-                                     xydimSearch=114,zdimSearch = 70,
-                                     sampleSize=1000,xyRealDim=0.264,
-                                     zRealDim = 0.44, pipeBinSize = 1)
-      dataTimePoint$Condition <- 
-      dataTimePoint$TimePoint <- 
-      growthDf<-rbind(growthDf,dataTimePoint)
-      }
-    }
-  return(growthDf)
-}
 
 GetPropOcData<-function(sampleName, xyDim,zDim){
+  tic()
+  #parentFolder<- '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/'
   parentFolder<- '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/'
   sampleFolder<-paste0(parentFolder, sampleName)
   attrList<-str_split(sampleName,"_")[[1]]
+  print(sampleName)
   fileList<-list.files(path = sampleFolder, full.names = TRUE)
+  print(paste("# of files:", length(fileList)))
+  if(length(fileList)<1){
+    print("empty set")
+    return(data.frame())
+  }else{
   greenImg<-fileList[grep("G_",fileList)]
   redImg<-fileList[grep("R_",fileList)]
-  propOcData<-AllDataPipeline(SlicesTo3D(redImg),SlicesTo3D(greenImg), 
+  propOcData<-AllDataPipeline(Slices2threeD(redImg),Slices2threeD(greenImg), 
                                      xydimSearch=round(30/xyDim),zdimSearch =round(30/zDim),
                                      sampleSize=10,xyRealDim=xyDim,
                                      zRealDim = zDim, pipeBinSize = 1)
   propOcData$Condition <- attrList[1]
   propOcData$TimePoint <- attrList[2]
   propOcData$Replicate <- attrList[3]
+  toc()
   write.csv(propOcData, paste0("/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/PropOc Data/",sampleName,".csv"))
-}
+  return(propOcData)}
+  }
 
-testGetPropOcData<-GetPropOcData("mono_d1_01", .415,.52)
-testPmap<-pmap(list(metaData.df$SampleCode, metaData.df$xyDim, metaData.df$Zdim),GetPropOcData)
+testGetPropOcData<-GetPropOcData("mono_d1_02", .415,.52)
+
+testGetPropOcDataemptyFolder<-GetPropOcData("wt_d1_01", .415,.52)
+testPmap<-pmap(list(metaData.df$SampleCode,metaData.df$xyDim, metaData.df$Zdim),
+               GetPropOcData)
 boundPmapTest<-bind_rows(testPmap)
+
+#Dummy function
+GetDummyOcData<-function(sampleName, xyDim,zDim){
+  parentFolder<- '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/'
+  sampleFolder<-paste0(parentFolder, sampleName)
+  attrList<-str_split(sampleName,"_")[[1]]
+  print(sampleName)
+  fileList<-list.files(path = sampleFolder, full.names = TRUE)
+  print(paste("# of files:", length(fileList)))
+  if(length(fileList)<1){
+    print("empty set")
+    return(data.frame())
+  }else{
+  greenImg<-fileList[grep("G_",fileList)]
+  redImg<-fileList[grep("R_",fileList)]
+  return(as.data.frame(list(length(greenImg), length(redImg))))
+  }
+  }
+testDummyData<-GetDummyOcData("mono_d1_02", .415,.52)
+testDummyEmptyFolder<-GetDummyOcData("wt_d1_01", .415,.52)
+dummyBind<-bind_rows(list(testDummyData,testDummyEmptyFolder))
 
 
 testGrep<-list.files(path = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/mono_d1_02', full.names = TRUE)
 testGrepG<-testGrep[grep("G_",testGrep)]
-
-GetSlice<-function(idx){
-  if (idx<10){num = paste0(0,idx)}
-  else
-  {num = idx}
-  return(num)}
 
 Slices2threeD<-function(fileList){
   image1<-as.array(readImage(fileList[1], convert = TRUE))#read first image to get its dimensions
@@ -89,6 +96,7 @@ Slices2threeD<-function(fileList){
   }
   return(image3D)
 }
+
 testSlices2threeD<-Slices2threeD(testGrepG)
 testGrepG[1]
 testImage1<-as.array(readImage(testGrepG[1], convert = TRUE))
