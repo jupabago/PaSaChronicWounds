@@ -14,7 +14,6 @@ library(plotrix)#for std error
 library(dplyr)
 library(cowplot)
 filter <- dplyr::filter
-source("~/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/PaSaChronicWounds/R/readTiff.R")
 library(EBImage) #for rtiff
 ```
 
@@ -462,13 +461,22 @@ ReadSliceFile<-function(file, timepoint, condition, replicate, sampleCode){#make
 #get data from csv file
 slicedData<-GetSliceData()
 #get metadata
-metaData.df <-read.csv('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/image data copy.csv', header = TRUE)
+metaData.df <-read.csv('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/images metadata.csv', header = TRUE)
 #merge files
-metaData.df<-metaData.df %>% select(SampleCode, mouse, Position, size, Voxel.size,Region, Zdim)
+metaData.df<-metaData.df %>% select(SampleCode, mouse, Position, size, Region, Zdim, xyDim)
 sliceDataMeta<-metaData.df %>%  merge(slicedData, by = "SampleCode")
 #clean up
 remove <- sliceDataMeta %>% filter(Channel == 2 & Condition == "mono")
 sliceDataMeta <- anti_join(sliceDataMeta, remove)
+
+aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "mono_d1_03_Pa" & !SampleCode == "mono_d1_03_Sa")
+aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "phz_d4_14_Pa" & !SampleCode == "phz_d4_14_Sa")
+aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "pqsL_d4_02_Pa" & !SampleCode == "pqsL_d4_02_Sa")
+aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "pqsL_d4_04_Pa" & !SampleCode == "pqsL_d4_04_Sa")
+aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "pqsL_d4_10_Pa" & !SampleCode == "pqsL_d4_10_Sa")
+aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "wt_d4_07_Pa" & !SampleCode == "wt_d4_07_Sa")
+
+
 #rename variables
 sliceDataMeta$Channel <- factor(sliceDataMeta$Channel, levels = c(1, 2, 3),labels = c('S. aureus','P. aeruginosa','host'))
 sliceDataMeta$Condition<- factor(sliceDataMeta$Condition, levels = c("mono", "wt", "pqsL", "phz"),labels = c('Sa mono','wt co', 'pqsL co', 'phz co'))
@@ -490,7 +498,8 @@ ggplot()+
   coord_flip()
   theme(plot.title = element_text(hjust = 0.5))
 #####
-#Max slice?
+#Filter by Max height of the sample
+#####  
 sliceDataMeta<-sliceDataMeta %>% group_by(SampleCode, Condition, Replicate, TimePoint) %>% mutate(MaxHeight = max(Height))
 ggplot()+
   geom_point(data = maxSlice%>% filter(MaxHeight<120 & MaxHeight>50),aes(x=Replicate,y=MaxHeight, color = Condition),size=4)+
@@ -502,7 +511,6 @@ facet_grid(.~TimePoint, scales = "free", space = "free")+
   theme(plot.title = element_text(hjust = 0.5),axis.text.x = element_text(angle = 70, hjust = 1))
 
 ggplot()+
-  #geom_point(data = sliceDataMeta ,aes(y=NormBiomass,x=Height, color = Condition, group = Replicate),size=.5)+
   geom_smooth(data = sliceDataMeta %>% filter(MaxHeight>50 & MaxHeight<120) ,aes(y=NormBiomass,x=Height, color = Condition),size=2)+
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray")+
   theme_cowplot()+
@@ -512,42 +520,30 @@ ggplot()+
   coord_flip()
   theme(plot.title = element_text(hjust = 0.5))
 
-
 ```
-
-```{r read Tiff functions}
-
-VectorizeTiff<-function(file){
-    counts<-sum(as.array(readImage(fileList[slice], convert = TRUE)))
-    growth[slice,]<-c(counts, slice, species)
-  }
-  
-  IterateTiff<-function(fileList, species){
-  growth<-matrix(ncol=3, nrow=length(fileList))
-  for(slice in 1:(length(fileList))){
-    counts<-sum(as.array(readImage(fileList[slice], convert = TRUE)))
-    growth[slice,]<-c(counts, slice, species)
-  }
-  growthDf<-data.fram(growth)
-return(growthDf) 
-  }
-
-
-
-testGetResults<-GetResults()
-testGetResults.df<- data.frame(testGetResults)
-#this was taken from the PropOc package
-SlicesTo3D<-function(filesList,side){
-  image1<-readTiff(filesList[1])#read first image to get its dimensions
-  image3D <- array(0, c(image1@size[1], image1@size[2], length(filesList)))#preallocate array for image given using image dimensions
-  for(i in 1:length(filesList)/3){#keep in mind that it is not zero-index
-    #print(paste("loading ch1...", i, "/", length(filesList), filesList[i]))
-    image3D[,,i]<-as.array(readImage(fileList[1], convert = TRUE))
-  }
-  return(image3D)
+```{r Metadata info}
+#How many samples have been binarized?
+GetTiffNum<-function(sampleName){
+  parentFolder<- '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/'
+  sampleFolder<-paste0(parentFolder, sampleName)
+  attrList<-str_split(sampleName,"_")[[1]]
+  fileList<-list.files(path = sampleFolder, full.names = TRUE)
+  tiffSlices<-(length(fileList))/3
+  results<-as.data.frame(list(sampleName, attrList[1],attrList[2],attrList[3], tiffSlices))
+  colnames(results)<- c("SampleCode","Condition", "TimePoint","Replicate","TiffSlices")
+  return(results)
 }
+tiffNum<-map(metaData.df$SampleCode, GetTiffNum)
+tiffNum<-bind_rows(tiffNum)
+sortedMetaData<-tiffNum %>% filter(TiffSlices==0)%>% select(SampleCode)
+sortedMetaData[order(sortedMetaData),]
+
+tiffStacksNew<-map(metaData.df$SampleCode, GetTiffNum)
+tiffStacksNew<-bind_rows(tiffStacksNew)
+tiffStacksNew %>% filter(TiffSlices==0) %>% select(SampleCode)
 
 ```
+
 
 ```{r Histogram functions}
 FancyHistogram<-function(df, sec){#my own way of doing histograms which includes the sum and mean of values whitin each bin
