@@ -21,19 +21,26 @@ library(EBImage) #for rtiff
 aggregateList<-GetAggregates()#this reads the data from Matlab
 #remove bad samples and irrelevant conditions
 ##first remove irrelevant conditions
-removable <- aggregateList %>% filter(Species == "Pa" & Condition == "mono")
+removable <- bind_rows(aggregateList %>% filter(Species == "Pa" & Condition == "mono"), #Pa in Sa mono culture
+                       aggregateList%>% filter(Species == "Sa" & Condition == "pawt"),#Sa in all Pa mono cultures
+                       aggregateList%>% filter(Species == "Sa" & Condition == "papqsL"),
+                       aggregateList%>% filter(Species == "Sa" & Condition == "paphz"))
 aggregateList <- anti_join(aggregateList, removable)
-##bad samples
+##then, bad samples
 aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "mono_d1_03_Pa" & !SampleCode == "mono_d1_03_Sa")
 aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "phz_d4_14_Pa" & !SampleCode == "phz_d4_14_Sa")
 aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "pqsL_d4_02_Pa" & !SampleCode == "pqsL_d4_02_Sa")
 aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "pqsL_d4_04_Pa" & !SampleCode == "pqsL_d4_04_Sa")
 aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "pqsL_d4_10_Pa" & !SampleCode == "pqsL_d4_10_Sa")
 aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "wt_d4_07_Pa" & !SampleCode == "wt_d4_07_Sa")
+aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "papqsL_d4_02_Pa" & !SampleCode == "papqsL_d4_02_Sa")
+aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "pawt_d4_05_Pa" & !SampleCode == "pawt_d4_05_Sa")
+aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "phz_d4_06_Pa" & !SampleCode == "phz_d4_06_Sa")
 
 #add proper labels for plots
 aggregateList$Species <- factor(aggregateList$Species, levels = c("Pa", "Sa"),labels = c('P. aeruginosa','S. aureus'))
-aggregateList$Condition <- factor(aggregateList$Condition, levels = c("mono", "wt", "pqsL", "phz"),labels = c('Sa mono','wt co', 'pqsL co', 'phz co'))
+aggregateList$Condition <- factor(aggregateList$Condition, levels = c("mono", "pawt","papqsL", "paphz", "wt", "pqsL", "phz"),
+                                  labels = c('Sa mono', 'Pa wt mono','pqsL mono','phz mono','wt co', 'pqsL co', 'phz co'))
 aggregateList$TimePoint <- factor(aggregateList$TimePoint, levels = c("d1", "d4"),labels = c('Day 1','Day 4'))
 #agregate input functions
 ReadAggregateFile<-function(file, species, timepoint, condition, replicate, sampleCode){#make a dataframe of the aggregate size list and add experimental parameters
@@ -453,6 +460,7 @@ ReadSliceFile<-function(file, timepoint, condition, replicate, sampleCode){#make
    datos$Replicate<-as.factor(datos$Replicate)
    datos$Condition<-as.factor(datos$Condition)
    datos$TimePoint<-as.factor(datos$TimePoint)
+   datos$SampleCode<-as.factor(datos$SampleCode)
    return(datos)
 }
 
@@ -462,24 +470,33 @@ ReadSliceFile<-function(file, timepoint, condition, replicate, sampleCode){#make
 slicedData<-GetSliceData()
 #get metadata
 metaData.df <-read.csv('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/images metadata.csv', header = TRUE)
+metaData.df$SampleCode<-as.factor(metaData.df$SampleCode)
+
 #merge files
-metaData.df<-metaData.df %>% select(SampleCode, mouse, Position, size, Region, Zdim, xyDim)
+metaData.df<-metaData.df %>% select(SampleCode, mouse, Position, size, Region, Zdim, xyDim,xySize)
 sliceDataMeta<-metaData.df %>%  merge(slicedData, by = "SampleCode")
 #clean up
-remove <- sliceDataMeta %>% filter(Channel == 2 & Condition == "mono")
+remove <- bind_rows(sliceDataMeta %>% filter(Channel == 2 & Condition == "mono"),
+                    sliceDataMeta %>% filter(Channel == 1 & Condition == "pawt"),
+                    sliceDataMeta %>% filter(Channel == 1 & Condition == "paphz"),
+                    sliceDataMeta %>% filter(Channel == 1 & Condition == "papqsL"))
+
 sliceDataMeta <- anti_join(sliceDataMeta, remove)
 
-aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "mono_d1_03_Pa" & !SampleCode == "mono_d1_03_Sa")
-aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "phz_d4_14_Pa" & !SampleCode == "phz_d4_14_Sa")
-aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "pqsL_d4_02_Pa" & !SampleCode == "pqsL_d4_02_Sa")
-aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "pqsL_d4_04_Pa" & !SampleCode == "pqsL_d4_04_Sa")
-aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "pqsL_d4_10_Pa" & !SampleCode == "pqsL_d4_10_Sa")
-aggregateListRemoved<-aggregateList %>% filter(!SampleCode == "wt_d4_07_Pa" & !SampleCode == "wt_d4_07_Sa")
-
+sliceDataMeta<-sliceDataMeta %>% filter(!SampleCode == "mono_d1_03")
+sliceDataMeta<-sliceDataMeta %>% filter(!SampleCode == "phz_d4_14") #didnt make it to this dataset but still making sure
+sliceDataMeta<-sliceDataMeta %>% filter(!SampleCode == "pqsL_d4_02")
+sliceDataMeta<-sliceDataMeta %>% filter(!SampleCode == "pqsL_d4_04")
+sliceDataMeta<-sliceDataMeta %>% filter(!SampleCode == "pqsL_d4_10")
+sliceDataMeta<-sliceDataMeta %>% filter(!SampleCode == "wt_d4_07")
+sliceDataMeta<-sliceDataMeta %>% filter(!SampleCode == "papqsL_d4_02")
+sliceDataMeta<-sliceDataMeta %>% filter(!SampleCode == "pawt_d4_05")
+sliceDataMeta<-sliceDataMeta %>% filter(!SampleCode == "phz_d4_06")
 
 #rename variables
 sliceDataMeta$Channel <- factor(sliceDataMeta$Channel, levels = c(1, 2, 3),labels = c('S. aureus','P. aeruginosa','host'))
-sliceDataMeta$Condition<- factor(sliceDataMeta$Condition, levels = c("mono", "wt", "pqsL", "phz"),labels = c('Sa mono','wt co', 'pqsL co', 'phz co'))
+sliceDataMeta$Condition<- factor(sliceDataMeta$Condition, levels = c("mono", "pawt","papqsL", "paphz", "wt", "pqsL", "phz"),
+                                  labels = c('Sa mono', 'Pa wt mono','pqsL mono','phz mono','wt co', 'pqsL co', 'phz co'))
 sliceDataMeta$TimePoint <- factor(sliceDataMeta$TimePoint, levels = c("d1", "d4"),labels = c('Day 1','Day 4'))
 #calculate relative biomass
 sliceDataMeta<-sliceDataMeta%>% filter(!Channel == "host") %>% mutate(Height = Zdim*Slice) %>% group_by(SampleCode, Channel) %>% mutate(TotalBiomass = sum(Biomass)) %>% ungroup() %>% mutate(NormBiomass = Biomass/TotalBiomass*100) 
@@ -500,18 +517,10 @@ ggplot()+
 #####
 #Filter by Max height of the sample
 #####  
-sliceDataMeta<-sliceDataMeta %>% group_by(SampleCode, Condition, Replicate, TimePoint) %>% mutate(MaxHeight = max(Height))
-ggplot()+
-  geom_point(data = maxSlice%>% filter(MaxHeight<120 & MaxHeight>50),aes(x=Replicate,y=MaxHeight, color = Condition),size=4)+
-facet_grid(.~TimePoint, scales = "free", space = "free")+
-  scale_color_brewer(palette = "Set1")+
-  geom_hline(yintercept = 120)+
-  geom_hline(yintercept = 50)+
-  theme_cowplot()+
-  theme(plot.title = element_text(hjust = 0.5),axis.text.x = element_text(angle = 70, hjust = 1))
+sliceDataSum<-sliceDataMeta %>% group_by(SampleCode, Condition, Replicate, TimePoint,xySize) %>% summarise(MaxHeight = max(Height)) %>% ungroup()
 
 ggplot()+
-  geom_smooth(data = sliceDataMeta %>% filter(MaxHeight>50 & MaxHeight<120) ,aes(y=NormBiomass,x=Height, color = Condition),size=2)+
+  geom_smooth(data = sliceDataSum %>% filter(MaxHeight>50 & MaxHeight<120) ,aes(y=NormBiomass,x=Height, color = Condition),size=2)+
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray")+
   theme_cowplot()+
   scale_color_brewer(palette = "Set1")+
@@ -531,10 +540,13 @@ GetTiffNum<-function(sampleName){
   tiffSlices<-(length(fileList))/3
   results<-as.data.frame(list(sampleName, attrList[1],attrList[2],attrList[3], tiffSlices))
   colnames(results)<- c("SampleCode","Condition", "TimePoint","Replicate","TiffSlices")
+  results$SampleCode<-as.factor(results$SampleCode)
   return(results)
 }
 tiffNum<-map(metaData.df$SampleCode, GetTiffNum)
 tiffNum<-bind_rows(tiffNum)
+totalVoxels2<-metaData.df %>%  merge(tiffNum, by = "SampleCode") %>% mutate(SizeVoxels = xySize*xySize*TiffSlices)
+
 sortedMetaData<-tiffNum %>% filter(TiffSlices==0)%>% select(SampleCode)
 sortedMetaData[order(sortedMetaData),]
 
@@ -542,6 +554,8 @@ tiffStacksNew<-map(metaData.df$SampleCode, GetTiffNum)
 tiffStacksNew<-bind_rows(tiffStacksNew)
 tiffStacksNew %>% filter(TiffSlices==0) %>% select(SampleCode)
 
+#How big are each of the image in bits?
+totalVoxels<-sliceDataMeta %>% group_by(SampleCode, Condition, Replicate, TimePoint,xySize) %>% summarise(MaxSlice = max(Slice)) %>% ungroup() %>% mutate(ImageVoxels = MaxSlice*xySize)
 ```
 
 
