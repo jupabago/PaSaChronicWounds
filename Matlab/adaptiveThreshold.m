@@ -15,23 +15,24 @@ Tiff2Data (rawTifPath,binTifPath,aggsFilePath,slicedAggsFilePath, xySize, zSize)
 end
 %}
 
-for sampleNumber = 1:7
-iterateSamples('phz_d1_',sampleNumber,.415,.52)
+for sampleNumber = 1:10
+iterateSamples('paphz_d4_',sampleNumber,.415,.52)
+end
+iterateSamples('papqsL_d4_',1,.208,.52)
+for sampleNumber = 3:10
+iterateSamples('papqsL_d4_',sampleNumber,.208,.52)
 end
 
-for sampleNumber = 1:14
-iterateSamples('phz_d4_',sampleNumber,.208,.52)
-end
-
-for sampleNumber = 1:16
-iterateSamples('pqsL_d4_',sampleNumber,.208,.52)
+for sampleNumber = 1:9
+iterateSamples('pawt_d4_',sampleNumber,.208,.52)
 end
 
 function iterateSamples(sampleName, sampleNum,xy,z)
-rawTifPathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks New/';
-binTifPathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/';
-aggsFilePathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists/'; %names are different
-slicedAggsFilePathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Results per slice/'; %names are different
+
+rawTifPathBase = '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks New/';
+binTifPathBase = '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/';
+aggsFilePathBase = '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists/'; %names are different
+slicedAggsFilePathBase = '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Results per slice/'; %names are different
 rawTifPath = [rawTifPathBase,sampleName,GetNum(sampleNum),'/'];
 binTifPath = [binTifPathBase,sampleName,GetNum(sampleNum),'/'];
 aggsFilePath = [aggsFilePathBase,sampleName,GetNum(sampleNum)];
