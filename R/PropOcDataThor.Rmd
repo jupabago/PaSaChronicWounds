@@ -32,7 +32,38 @@ source('/Users/jupabago/Documents/Whiteley/PROJECTS/Rpackage/PropOc Package/R/Pr
 
 metaData.df <-read.csv('/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/images metadata.csv', header = TRUE)
 
-GetPropOcData<-function(sampleName, xyDim,zDim){
+for(row in 1:length(metaData.df[[1]])){
+  metaData.df$Condition[[row]] = str_split(metaData.df$SampleCode[[row]],"_")[[1]][[1]]
+}
+metaData.df<-metaData.df %>% filter(!is.na(mouse))#removes the last row
+
+metaData.df<- metaData.df %>% #remove samples that have already ran
+  filter(!SampleCode == "pqsL_d4_16") %>%
+  filter(!SampleCode == "mono_d1_03") %>%#stalled
+  filter(!SampleCode == "mono_d1_02") %>% #ran
+  filter(!SampleCode == "mono_d1_01") %>% #ran
+  filter(!SampleCode == "mono_d1_04") %>% #ran
+  filter(!SampleCode == "mono_d1_05") %>% #ran
+  filter(!SampleCode == "mono_d1_06") %>%  #seemed to have stalled but data file is saved
+  filter(!SampleCode == "mono_d1_07") %>% #seemed to have stalled but data file is saved
+  filter(!SampleCode == "mono_d1_08") %>%
+  filter(!SampleCode == "mono_d1_09") %>%
+  filter(!SampleCode == "mono_d1_10") %>%
+  filter(!SampleCode == "mono_d1_11") %>%
+  filter(!SampleCode == "mono_d1_12") %>%
+  filter(!SampleCode == "mono_d1_13") %>%
+  filter(!SampleCode == "mono_d1_14") %>%
+  filter(!SampleCode == "mono_d1_15") %>%
+  filter(!SampleCode == "mono_d4_01") %>%
+  filter(!SampleCode == "mono_d4_02") %>%
+  filter(!SampleCode == "mono_d4_03") %>%
+  filter(!SampleCode == "mono_d4_04") 
+
+metaData.df<-metaData.df %>% filter(!Condition == "mono") %>% 
+  filter(!Condition == "pawt") %>% 
+  filter(!Condition == "paphz") %>% 
+  filter(!Condition == "papqsL")
+  
   tic()
   parentFolder<- '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/'
   #parentFolder<- '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/'
@@ -48,7 +79,7 @@ GetPropOcData<-function(sampleName, xyDim,zDim){
   redImg<-fileList[grep("R_",fileList)]
   propOcData<-AllDataPipeline(Slices2threeD(redImg),Slices2threeD(greenImg), 
                                      xydimSearch=round(30/xyDim),zdimSearch =round(30/zDim),
-                                     sampleSize=10,xyRealDim=xyDim,
+                                     sampleSize=1000,xyRealDim=xyDim,
                                      zRealDim = zDim, pipeBinSize = 1)
   propOcData$Condition <- attrList[1]
   propOcData$TimePoint <- attrList[2]
@@ -57,7 +88,7 @@ GetPropOcData<-function(sampleName, xyDim,zDim){
   toc()}
   }
 
-testGetPropOcData<-GetPropOcData("wt_d1_02", .415,.52)
+testGetPropOcData<-GetPropOcData("phz_d4_08", .415,.52)
 testGetPropOcDataemptyFolder<-GetPropOcData("wt_d1_01", .415,.52)
 
 blah<-pmap(list(metaData.df$SampleCode,metaData.df$xyDim, metaData.df$Zdim),
@@ -99,11 +130,6 @@ Slices2threeD<-function(fileList){
   return(image3D)
 }
 
-testSlices2threeD<-Slices2threeD(testGrepG)
-testGrepG[1]
-testImage1<-as.array(readImage(testGrepG[1], convert = TRUE))
-install.packages("BiocManager")
-BiocManager::install("EBImage")
 ```
 
 ```{r running functions}
