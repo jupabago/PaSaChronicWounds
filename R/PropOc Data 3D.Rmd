@@ -318,8 +318,75 @@ PlotCVrelation("Sa->Pa")
 ```
 # Importing whole data sets to identify distribution of data
 ```{r read whole data sets}
-ReadPropOc<-function(sampleName){
-propOcData<-read.csv(paste0("/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/PropOc Data/", sampleName,".csv"),header = T)
+
+ReadPropOcFile<-function(file){
+    propOcData<-read.csv(file,header = T)
+    fileName<-str_split(basename(file), "\\.")[[1]][1]#this selects the base file name and removes the ".csv"
+    print(paste0("Importing sample ", fileName))
+    attrList<-str_split(fileName,"_")[[1]]
+    propOcData<-propOcData %>% mutate(Condition = attrList[1], TimePoint = attrList[2], Replicate = attrList[3], SampleCode = fileName)
+    return(propOcData)
+    }
+
+propOcDatafolder<-'/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/PropOc Data'
+propOcDatafileList<-list.files(path = propOcDatafolder, full.names = TRUE)
+rawPropOcDataList<-map(propOcDatafileList,ReadPropOcFile)
+rawPropOcData<-bind_rows(rawPropOcDataList)
+rawPropOcData<-rawPropOcData %>% filter(!SampleCode=="mono_d1_01Slim") %>%  filter(!SampleCode=="mono_d1_02Slim")
+
+#QC for data:
+##How much data is just straight up missing?
+#####
+countData<-rawPropOcData %>% group_by(SampleCode, source, Distance) %>% summarize(count = n()) %>% filter(count<1000) %>%ungroup() %>% summarise(MisingTotal = n()*1000-sum(count),TotalMedian = median(count), Mean = mean(count))
+
+countData2<-rawPropOcData %>% group_by(SampleCode, source, Distance) %>% summarize(count = n()) %>% filter(count<1000) %>%ungroup() %>% group_by(SampleCode) %>% summarise(MisingTotal = n()*1000-sum(count),TotalMedian = median(count), Mean = mean(count)) %>% mutate(MissingPercent = (1000-Mean)/1000)
+##How much of the missing data matters?
+
+#first, remove the unnecessary conditions
+removablePropOc <- bind_rows(rawPropOcData %>% filter(Condition == "mono") %>% filter(!source == "finalRR"), #Pa in Sa mono culture
+                       rawPropOcData %>% filter(Condition == "papqsL") %>% filter(!source == "finalGG"),#Sa in all Pa mono cultures
+                       rawPropOcData %>% filter(Condition == "pawt") %>% filter(!source == "finalGG"),
+                       rawPropOcData %>% filter(Condition == "paphz") %>% filter(!source == "finalGG"))
+rawPropOcDataClean <- anti_join(rawPropOcData, removablePropOc)
+
+##then, bad samples
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "mono_d1_03")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "phz_d4_14")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "pqsL_d4_02")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "pqsL_d4_04")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "pqsL_d4_10")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "wt_d4_07")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "papqsL_d4_02")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "pawt_d4_05")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "phz_d4_06")
+
+#Do it again
+countDataClean<-rawPropOcDataClean %>% group_by(SampleCode, source, Distance) %>% summarize(count = n()) %>% filter(count<1000) %>%ungroup() %>% summarise(MisingTotal = n()*1000-sum(count),TotalMedian = median(count), Mean = mean(count))
+
+countDataClean2<-rawPropOcDataClean %>% group_by(SampleCode, source, Distance) %>% summarize(count = n()) %>% filter(count<1000) %>%ungroup() %>% group_by(SampleCode) %>% summarise(MisingTotal = n()*1000-sum(count),TotalMedian = median(count), Mean = mean(count)) %>% mutate(MissingPercent = (1000-Mean)/1000)
+#it got a little better, but not that much...
+#####
+#How much of it is outside the ideal boundaries?
+
+CheckBenchmark<-function(benchmark){
+CheckPropOc<-rawPropOcDataClean %>% filter(PropOc>benchmark|PropOc<0)
+percentInbound<-length(CheckPropOc$SampleCode)/length(rawPropOcDataClean$SampleCode)*100
+return(percentInbound)}
+
+CheckBenchmark(1)
+
+ggplot()+
+  geom_jitter(data = countData,aes(x=Distance,y=X, color = source ),size=4, height= .1)+
+  #labs(title ="title")+
+  #scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+
+GetHistograms<-function(sample){
+
 data<-propOcData%>% filter(PropOc <1.02) %>% group_by(Distance, source) 
   dataList<-group_split(data)#split data fram into a list of dataframes with a single distance and from a single source
   histogramList<-map(dataList, HistogramDistance)#run the function on each item of the list created at the top
@@ -347,17 +414,8 @@ testReadPropOc3<-ReadPropOc("mono_d1_01") #this is without specifying breaks
 
 testReadPropOcLaptop<-ReadPropOc("mono_d1_01Laptop") 
 
-rawPropOcData<-read.csv(paste0("/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/PropOc Data/", "mono_d1_01Laptop",".csv"),header = T)
+testrawPropOcData<-read.csv(paste0("/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/PropOc Data/", "mono_d1_01",".csv"),header = T)
 
-#QC for data:
-countData<-rawPropOcData %>% group_by(source, Distance) %>% summarize(count = n()) %>% filter(count<1000) %>%ungroup() %>% summarise(MisingTotal = n()*1000-sum(count),TotalMedian = median(count), Mean = mean(count))
-CheckPropOc<-rawPropOcData %>% filter(PropOc>1.05|PropOc<0)
-ggplot()+
-  geom_jitter(data = countData,aes(x=Distance,y=X, color = source ),size=4, height= .1)+
-  #labs(title ="title")+
-  #scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
-  theme_cowplot()+
-  theme(plot.title = element_text(hjust = 0.5))
 
 
 ```
