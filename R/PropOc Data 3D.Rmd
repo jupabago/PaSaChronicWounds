@@ -366,24 +366,43 @@ countDataClean<-rawPropOcDataClean %>% group_by(SampleCode, source, Distance) %>
 countDataClean2<-rawPropOcDataClean %>% group_by(SampleCode, source, Distance) %>% summarize(count = n()) %>% filter(count<1000) %>%ungroup() %>% group_by(SampleCode) %>% summarise(MisingTotal = n()*1000-sum(count),TotalMedian = median(count), Mean = mean(count)) %>% mutate(MissingPercent = (1000-Mean)/1000)
 #it got a little better, but not that much...
 #####
-#How much of it is outside the ideal boundaries?
+#What are the observations missing?
+#####
+countDistancesALL<-rawPropOcDataClean %>% group_by(SampleCode,Condition, Distance) %>% summarise(count = n()) %>% ungroup() %>%group_by(Condition) %>%  mutate(difference = max(count)- count)
+countDistancesBadOnly<- countDistancesALL%>% filter(difference>0) %>% group_by(SampleCode) %>% summarise(missingDistantes = n()) %>% filter(missingDistantes == 30)
+countDistancesGoodOnly<- countDistancesALL%>% filter(difference==0) %>% group_by(SampleCode) %>% summarise(missingDistantes = 30-n()) %>% filter (missingDistantes==0)
 
+leftover<-anti_join(countDistancesALL,countDistancesBadOnly, by = "SampleCode")
+leftover<-anti_join(leftover,countDistancesGoodOnly, by = "SampleCode")
+
+#####
+#How much of it is outside the ideal boundaries?
+#####
 CheckBenchmark<-function(benchmark){
 CheckPropOc<-rawPropOcDataClean %>% filter(PropOc>benchmark|PropOc<0)
 percentInbound<-length(CheckPropOc$SampleCode)/length(rawPropOcDataClean$SampleCode)*100
 return(percentInbound)}
 
-CheckBenchmark(1)
+CheckBenchmark(1.05)
+#the data outside the range should be primarily at really short distances, since this is where the calculation of voxels in the surrounding and sphere of potentially ocuppied space is the largest  
+#I think 1.05 is a good benchmark to observe this trend:
+CheckPropOc<-rawPropOcDataClean %>% filter(PropOc>1.05|PropOc<0) 
 
 ggplot()+
-  geom_jitter(data = countData,aes(x=Distance,y=X, color = source ),size=4, height= .1)+
+  geom_jitter(data = CheckPropOc %>% filter(!source == "finalRR") %>% filter(!source == "finalGG") %>% filter(PropOc<1000),aes(x=Distance,y=PropOc, color = source ),size=2, height= .1)+
   #labs(title ="title")+
-  #scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
   theme_cowplot()+
   theme(plot.title = element_text(hjust = 0.5))
 
-
-
+blah<-CheckPropOc %>% filter(!PropOc<0) %>% group_by(Distance) %>% summarise(counts = n())
+ggplot()+
+  geom_point(data = blah,aes(x=Distance,y=counts),size=4)+
+  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5))
+#seems like the data outside the boundaries certainly tends to be at low distances, but the values themselves increase with distance
+#####
 
 GetHistograms<-function(sample){
 
