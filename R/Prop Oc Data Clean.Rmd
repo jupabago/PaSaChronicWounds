@@ -1,0 +1,79 @@
+---
+title: "Prop Oc Data Chronic Wounds"
+author: "Juan P Barraza"
+date: "8/14/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+library(pixmap)
+library(rtiff)
+library(reshape2)
+library(gplots)
+library(gdata)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(cowplot)
+library(tidyr)
+library(purrr)
+library(plotrix)
+library(ggsignif)
+library(rdist)
+library(stringr)
+
+
+
+lseq <- function(from, to, length.out) {
+  # logarithmic spaced sequence
+  # blatantly stolen from library("emdbook"), because need only this
+  exp(seq(log(from), log(to), length.out = length.out))}
+
+source('/Users/jupabago/Documents/Whiteley/PROJECTS/Rpackage/PropOc Package/R/PropOcFunctions2.0.R') 
+
+ReadPropOcFile<-function(file){
+    propOcData<-read.csv(file,header = T)
+    fileName<-str_split(basename(file), "\\.")[[1]][1]#this selects the base file name and removes the ".csv"
+    print(paste0("Importing sample ", fileName))
+    attrList<-str_split(fileName,"_")[[1]]
+    propOcData<-propOcData %>% mutate(Condition = attrList[1], TimePoint = attrList[2], Replicate = attrList[3], SampleCode = fileName)
+    return(propOcData)
+    }
+
+propOcDatafolder<-'/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/PropOc Data1'
+propOcDatafileList<-list.files(path = propOcDatafolder, full.names = TRUE)
+rawPropOcDataList<-map(propOcDatafileList,ReadPropOcFile)
+rawPropOcData<-bind_rows(rawPropOcDataList)
+#rawPropOcData<-rawPropOcData %>% filter(!SampleCode=="mono_d1_01Slim") %>%  filter(!SampleCode=="mono_d1_02Slim")
+
+#QC for data:
+##How much data is just straight up missing?
+#####
+countData<-rawPropOcData %>% group_by(SampleCode, source, Distance) %>% summarize(count = n()) %>% filter(count<1000) %>%ungroup() %>% summarise(MisingTotal = n()*1000-sum(count),TotalMedian = median(count), Mean = mean(count))
+
+countData2<-rawPropOcData %>% group_by(SampleCode, source, Distance) %>% summarize(count = n()) %>% ungroup() %>%filter(count<1000) %>%ungroup() %>% group_by(SampleCode) %>% summarise(MisingTotal = n()*1000-sum(count),TotalMedian = median(count), Mean = mean(count), N = n()) %>% mutate(MissingPercent = MisingTotal/120000*100)
+
+countDistancesALL<-rawPropOcData %>% group_by(SampleCode,source, Distance) %>% summarise(count = n()) %>% ungroup() %>%  mutate(difference = max(count)- count)
+ggplot()+
+  geom_point(data = countDistancesALL,aes(x=Distance,y=difference, shape = source, color = SampleCode),size=4)+
+  labs(title ="Prop Oc Analysis Sampling missing by Source and Distance")+
+  facet_grid(.~source)+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+#from 120 possible distance-source combinations, how many of those are missing? 
+countDistancesBadOnly<- countDistancesALL%>% filter(difference>0) %>% group_by(SampleCode) %>%  summarise(missingDistantes = n())
+
+#####
+#How much of it is outside the ideal boundaries?
+#####
+CheckBenchmark<-function(benchmark){
+#CheckPropOc<-rawPropOcData %>% filter(PropOc>benchmark|PropOc<0)
+CheckPropOc<-rawPropOcData %>% filter(PropOc<0)
+percentInbound<-length(CheckPropOc$SampleCode)/length(rawPropOcDataClean$SampleCode)*100
+return(percentInbound)}
+
+CheckBenchmark(1.5)
+```
