@@ -368,22 +368,30 @@ countDataClean2<-rawPropOcDataClean %>% group_by(SampleCode, source, Distance) %
 #####
 #What are the observations missing?
 #####
-countDistancesALL<-rawPropOcDataClean %>% group_by(SampleCode,Condition, Distance) %>% summarise(count = n()) %>% ungroup() %>%group_by(Condition) %>%  mutate(difference = max(count)- count)
-countDistancesBadOnly<- countDistancesALL%>% filter(difference>0) %>% group_by(SampleCode) %>% summarise(missingDistantes = n()) %>% filter(missingDistantes == 30)
-countDistancesGoodOnly<- countDistancesALL%>% filter(difference==0) %>% group_by(SampleCode) %>% summarise(missingDistantes = 30-n()) %>% filter (missingDistantes==0)
+countDistancesALL<-rawPropOcDataClean %>% group_by(SampleCode,Condition, source,Distance) %>% summarise(count = n()) %>% ungroup() %>%group_by(Condition) %>%  mutate(difference = max(count)- count)
 
-leftover<-anti_join(countDistancesALL,countDistancesBadOnly, by = "SampleCode")
-leftover<-anti_join(leftover,countDistancesGoodOnly, by = "SampleCode")
+countDistancesALLwt<- countDistancesALL %>% filter(Condition=="wt")
+countDistancesALLpqsL<- countDistancesALL %>% filter(Condition=="pqsL")
 
+ggplot()+
+  geom_point(data = countDistancesALLpqsL,aes(x=Distance,y=difference, shape = source, color = SampleCode),size=4)+
+  labs(title ="Prop Oc Analysis Sampling missing by Source and Distance(Original Run")+
+  facet_grid(.~source)+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5))
 #####
 #How much of it is outside the ideal boundaries?
 #####
 CheckBenchmark<-function(benchmark){
-CheckPropOc<-rawPropOcDataClean %>% filter(PropOc>benchmark|PropOc<0)
+#CheckPropOc<-rawPropOcDataClean %>% filter(PropOc>benchmark|PropOc<0)
+CheckPropOc<-rawPropOcData %>% filter(PropOc<0)
 percentInbound<-length(CheckPropOc$SampleCode)/length(rawPropOcDataClean$SampleCode)*100
 return(percentInbound)}
 
 CheckBenchmark(1.05)
+CheckBenchmark(1.1)
+CheckBenchmark(1.2)
+
 #the data outside the range should be primarily at really short distances, since this is where the calculation of voxels in the surrounding and sphere of potentially ocuppied space is the largest  
 #I think 1.05 is a good benchmark to observe this trend:
 CheckPropOc<-rawPropOcDataClean %>% filter(PropOc>1.05|PropOc<0) 
