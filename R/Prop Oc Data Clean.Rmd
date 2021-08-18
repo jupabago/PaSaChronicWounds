@@ -24,15 +24,15 @@ library(ggsignif)
 library(rdist)
 library(stringr)
 
-
-
 lseq <- function(from, to, length.out) {
   # logarithmic spaced sequence
   # blatantly stolen from library("emdbook"), because need only this
   exp(seq(log(from), log(to), length.out = length.out))}
 
 source('/Users/jupabago/Documents/Whiteley/PROJECTS/Rpackage/PropOc Package/R/PropOcFunctions2.0.R') 
+```
 
+```{r import data}
 ReadPropOcFile<-function(file){
     propOcData<-read.csv(file,header = T)
     fileName<-str_split(basename(file), "\\.")[[1]][1]#this selects the base file name and removes the ".csv"
@@ -42,11 +42,36 @@ ReadPropOcFile<-function(file){
     return(propOcData)
     }
 
-propOcDatafolder<-'/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/PropOc Data1'
+propOcDatafolder<-'/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/PropOc Data'
 propOcDatafileList<-list.files(path = propOcDatafolder, full.names = TRUE)
 rawPropOcDataList<-map(propOcDatafileList,ReadPropOcFile)
 rawPropOcData<-bind_rows(rawPropOcDataList)
-#rawPropOcData<-rawPropOcData %>% filter(!SampleCode=="mono_d1_01Slim") %>%  filter(!SampleCode=="mono_d1_02Slim")
+```
+```{r QC for data}
+#first, remove the unnecessary conditions
+removablePropOc <- bind_rows(rawPropOcData %>% filter(Condition == "mono") %>% filter(!source == "finalRR"), #Pa in Sa mono culture
+                       rawPropOcData %>% filter(Condition == "papqsL") %>% filter(!source == "finalGG"),#Sa in all Pa mono cultures
+                       rawPropOcData %>% filter(Condition == "pawt") %>% filter(!source == "finalGG"),
+                       rawPropOcData %>% filter(Condition == "paphz") %>% filter(!source == "finalGG"))
+rawPropOcDataClean <- anti_join(rawPropOcData, removablePropOc)
+
+lowCountSamples<-bind_rows(rawPropOcData %>% filter(Sample == "mono_d1_02"),
+                           rawPropOcData %>% filter(Sample == "phz_d4_08"),
+                           rawPropOcData %>% filter(Sample == "wt_d4_11") %>% filter(Source == "finalRG"))
+rawPropOcDataClean <- anti_join(rawPropOcDataClean, lowCountSamples)
+
+
+
+##then, bad samples
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "mono_d1_03")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "phz_d4_14")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "pqsL_d4_02")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "pqsL_d4_04")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "pqsL_d4_10")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "wt_d4_07")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "papqsL_d4_02")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "pawt_d4_05")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "phz_d4_06")
 
 #QC for data:
 ##How much data is just straight up missing?
@@ -55,6 +80,7 @@ countData<-rawPropOcData %>% group_by(SampleCode, source, Distance) %>% summariz
 
 countData2<-rawPropOcData %>% group_by(SampleCode, source, Distance) %>% summarize(count = n()) %>% ungroup() %>%filter(count<1000) %>%ungroup() %>% group_by(SampleCode) %>% summarise(MisingTotal = n()*1000-sum(count),TotalMedian = median(count), Mean = mean(count), N = n()) %>% mutate(MissingPercent = MisingTotal/120000*100)
 
+#What are the observations missing?
 countDistancesALL<-rawPropOcData %>% group_by(SampleCode,source, Distance) %>% summarise(count = n()) %>% ungroup() %>%  mutate(difference = max(count)- count)
 ggplot()+
   geom_point(data = countDistancesALL,aes(x=Distance,y=difference, shape = source, color = SampleCode),size=4)+
@@ -65,7 +91,11 @@ ggplot()+
 
 #from 120 possible distance-source combinations, how many of those are missing? 
 countDistancesBadOnly<- countDistancesALL%>% filter(difference>0) %>% group_by(SampleCode) %>%  summarise(missingDistantes = n())
-
+#dont know if this works
+#lowCountSamples<-bind_rows(rawPropOcDataClean %>% filter(Sample == "mono_d1_02"),
+#                           rawPropOcDataClean %>% filter(Sample == "phz_d4_08"),
+#                           rawPropOcDataClean %>% filter(Sample == "wt_d4_11") %>% filter(Source == "finalRG"))
+#rawPropOcDataClean <- anti_join(rawPropOcDataClean, lowCountSamples)
 #####
 #How much of it is outside the ideal boundaries?
 #####
@@ -75,5 +105,110 @@ CheckPropOc<-rawPropOcData %>% filter(PropOc<0)
 percentInbound<-length(CheckPropOc$SampleCode)/length(rawPropOcDataClean$SampleCode)*100
 return(percentInbound)}
 
-CheckBenchmark(1.5)
+CheckBenchmark(1.5)#This is the benchmark I picked
+
+#the data outside the range should be primarily at really short distances, since this is where the calculation of voxels in the surrounding and sphere of potentially ocuppied space is the largest  
+#I think 1.05 is a good benchmark to observe this trend:
+CheckPropOc<-rawPropOcDataClean %>% filter(PropOc>1.5|PropOc<0) 
+
+ggplot()+
+  geom_jitter(data = CheckPropOc %>% filter(!source == "finalRR") %>% filter(!source == "finalGG") %>% filter(PropOc<1000),aes(x=Distance,y=PropOc, color = source ),size=2, height= .1)+
+  #labs(title ="title")+
+  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+blah<-CheckPropOc %>% filter(!PropOc<0) %>% group_by(Distance) %>% summarise(counts = n())
+ggplot()+
+  geom_point(data = blah,aes(x=Distance,y=counts),size=4)+
+  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5))
+#seems like the data outside the boundaries certainly tends to be at low distances, but the values themselves increase with distance
+#####
+```
+```{r wrangling clean Data}
+
+#Add New variaible to the data frame capping the value pf propOc to 1
+rawPropOcDataClean$PropOc1= rawPropOcDataClean$PropOc
+rawPropOcDataClean$PropOc1[rawPropOcDataClean$PropOc1>1] = 1
+rawPropOcDataClean$PropOc1[rawPropOcDataClean$PropOc1<0] = 0
+#make new data frame for downstream analysis
+PropOcDataFiltered<-rawPropOcDataClean %>% filter(PropOc<1.5) %>% filter(PropOc>=0)
+#make column factors 
+PropOcDataFiltered$SampleCode<-as.factor(PropOcDataFiltered$SampleCode)
+PropOcDataFiltered$TimePoint<-as.factor(PropOcDataFiltered$TimePoint)
+PropOcDataFiltered$Condition<-as.factor(PropOcDataFiltered$Condition)
+PropOcDataFiltered$source<-as.factor(PropOcDataFiltered$source)
+PropOcDataFiltered$Replicate<-as.factor(PropOcDataFiltered$Replicate)
+
+
+#From this point on there are at least two ways to move forward. The simplest one is to get the mean, mode and variance in the data
+meanPOData<-PropOcDataFiltered %>% group_by(SampleCode, TimePoint, source, Distance, Condition) %>% summarise(MeanPO = mean(PropOc1), MedianPO = median(PropOc1), SDPO = sd(PropOc1), SEPO = std.error(PropOc1))
+
+#label and merge with metadata for plotting, output of this is pOMeanMeta dataframe used for plots
+#####
+meanPOData$Condition <- factor(meanPOData$Condition, levels = c("mono", "pawt","papqsL", "paphz", "wt", "pqsL", "phz"),labels = c('Sa mono', 'Pa wt mono','pqsL mono','phz mono','wt co', 'pqsL co', 'phz co'))
+meanPOData$TimePoint <- factor(meanPOData$TimePoint, levels = c("d1", "d4"),labels = c('Day 1','Day 4'))
+meanPOData<-meanPOData%>% mutate(Relation = recode(source, "finalGG" = "Pa->Pa","finalRG" = "Sa->Pa","finalRR" = "Sa->Sa","finalGR" = "Pa->Sa"))
+meanPOData<-meanPOData%>% mutate(Culture = recode(Condition, 'Sa mono' = "mono", 'Pa wt mono' = "mono",'pqsL mono'= "mono",'phz mono'= "mono",'wt co'= "co", 'pqsL co'= "co", 'phz co'= "co"))
+meanPOData<-meanPOData%>% mutate(Strain = recode(Condition, 'Sa mono' = "Sa", 'Pa wt mono' = "wt",'pqsL mono'= "pqsL",'phz mono'= "phz",'wt co'= "wt", 'pqsL co'= "pqsL", 'phz co'= "phz"))
+
+metaData.df<-metaData.df %>% select(SampleCode, mouse, Position, size, Region, Zdim, xyDim,xySize)
+pOMeanMeta<-metaData.df %>%  merge(meanPOData, by = "SampleCode")
+pOMeanMeta <- pOMeanMeta %>% mutate(diffMean = MeanPO/MedianPO)
+pOMeanMeta$Region <- factor(pOMeanMeta$Region, levels = c("core", "edge",""))
+
+#####
+
+#Plot Mean PropOc
+#####
+PlotMeanPOs<-function(relation){
+  ggplot()+
+    geom_point(data =pOMeanMeta%>%filter(Relation == relation),aes(x=Distance,y=MeanPO,color = Region),size=2)+
+    #geom_pointrange(data =pOMeanMeta%>%filter(Relation == relation),aes(x=Distance,y=MeanPO,  ymax = MeanPO+SDPO,ymin = MeanPO-SDPO,color =Condition, shape = "Mean"),size=1)+
+    #geom_point(data =pOMeanMeta%>%filter(Relation == relation),aes(x=Distance,y = MedianPO,color = "Median"),size=2)+
+    labs(title =paste("Mean PO", relation))+
+    #facet_grid(Condition~TimePoint,scales = "free", space = "free")+
+    scale_color_brewer(palette = "Set1")+
+    facet_grid(Condition~TimePoint)+
+    theme_cowplot()+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),plot.title = element_text(hjust = 0.5))
+}
+PlotMeanPOs("Pa->Sa")
+PlotMeanPOs("Sa->Pa")
+PlotMeanPOs("Sa->Sa")
+PlotMeanPOs("Pa->Pa")
+#####
+
+#Calculate the Enrichment
+pOcEnriMean<- pOMeanMeta %>% group_by(SampleCode,Relation)%>% mutate(Enrichment = max(MeanPO)) %>%
+  mutate(EnrichmentCh = ifelse(Enrichment == MeanPO, 1, 0 )) %>% filter(EnrichmentCh==1) %>% 
+  mutate(DoubledValues = sum(EnrichmentCh)) %>% ungroup()#find max
+###Sorry this is out of order
+lowCountSamples<-bind_rows(pOcEnriMean %>% filter(SampleCode == "mono_d1_02"),
+                           pOcEnriMean %>% filter(SampleCode == "phz_d4_08"),
+                           pOcEnriMean %>% filter(SampleCode == "wt_d4_11") %>% filter(source == "finalRG"))
+pOcEnriMean <- anti_join(pOcEnriMean, lowCountSamples)
+
+PlotEnrichmentMean<-function(relation){
+  ggplot()+
+    geom_point(data = pOcEnriMean %>% filter(Relation == relation),aes(y=MeanPO,x = SampleCode,shape = Region,  color =Condition),size=2)+
+    #geom_label(data = propOcEnrichment %>% filter(Relation == relation),aes(y=30, x = Sample, label = Value),size=2)+
+    labs(title =paste("50 percentile Enrichment", relation))+
+    facet_grid(.~TimePoint,scales = "free", space = "free")+
+    #scale_color_gradientn(colours = rainbow(5))+
+    #scale_shape_manual(values=c(0,1,2, 15,16,17))+
+    theme_cowplot()+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),plot.title = element_text(hjust = 0.5))
+}
+PlotEnrichmentMean("Pa->Sa")
+PlotEnrichmentMean("Sa->Pa")
+PlotEnrichmentMean("Sa->Sa")
+PlotEnrichmentMean("Pa->Pa")
+
+#Get stats across samples
+pOMeanStatsRgn<-pOMeanMeta %>% ungroup() %>% group_by(Condition,Culture,Strain,TimePoint, Distance, Relation, Region) %>% summarize(meanValue = mean(MeanPO), sdValue = sd(MeanPO), medianValue = median(MeanPO))
+
+
 ```
