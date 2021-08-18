@@ -15,7 +15,7 @@ Tiff2Data (rawTifPath,binTifPath,aggsFilePath,slicedAggsFilePath, xySize, zSize)
 end
 %}
 
-for sampleNumber = 1:10
+for sampleNumber = 
 iterateSamples('paphz_d4_',sampleNumber,.415,.52)
 end
 iterateSamples('papqsL_d4_',1,.208,.52)
