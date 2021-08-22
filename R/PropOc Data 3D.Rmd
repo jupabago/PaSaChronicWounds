@@ -1,0 +1,1075 @@
+---
+title: "PropOcData2"
+author: "Juan P Barraza"
+date: "3/5/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+library(pixmap)
+library(rtiff)
+library(reshape2)
+library(gplots)
+library(gdata)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(cowplot)
+library(tidyr)
+library(purrr)
+library(plotrix)
+library(ggsignif)
+library(rdist)
+library("vcd")#this is fro fitting models to data
+library(viridis)#color palette
+library(gganimate)#gifs for ggplot
+
+lseq <- function(from, to, length.out) {
+  # logarithmic spaced sequence
+  # blatantly stolen from library("emdbook"), because need only this
+  exp(seq(log(from), log(to), length.out = length.out))}
+
+source('/Users/jupabago/Documents/Whiteley/PROJECTS/Rpackage/PropOc Package/R/PropOcFunctions2.0.R') 
+#using the new 3D script with capped spheres.
+```
+
+```{r functions to get PropOc Data}
+GetPropOcData<-function(sample, timepoints, positions){
+  folder<- paste0('/Volumes/Seagate Backup Plus Drive/Good images/',sample,'/imagesSubtractRed')
+  growthDf<-data.frame()#data frame to add all timepoints and positions
+  fileList<-list.files(path = folder, full.names = TRUE)
+  print(folder)
+  for (position in 0:positions){
+    currentPosition<-fileList[grep(paste0("p",position,"_"),fileList)]
+    print(paste0('analyzing position ', position))
+    for (timepoint in 0:timepoints){
+      currentTimePoint<-currentPosition[grep(paste0("t",GetSlice(timepoint),"_"),currentPosition)]
+      dataTimePoint<-NormRawPipeline(SlicesTo3D(currentTimePoint,"red"),SlicesTo3D(currentTimePoint,"green"), 
+                                     xydimSearch=114,zdimSearch = 70, sampleSize=1000,xyRealDim=0.264,
+                                     zRealDim = 0.44, pipeBinSize = 1)
+      dataTimePoint$TimePoint <- timepoint
+      dataTimePoint$Position <- position
+      growthDf<-rbind(growthDf,dataTimePoint)
+      }
+    }
+  return(growthDf)
+  }
+
+GetSlice<-function(idx){
+if (idx<10){num = paste0(0,idx)}
+  else
+    {num = idx}
+  return(num)}
+```
+```{r run functions}
+wt1<-GetPropOcData("3-13-19",6,2)
+wt2<-GetPropOcData("3-19-19",6,2)
+wt3<-GetPropOcData("4-17-19",6,2)
+mut1<-GetPropOcData("4-24-19",6,2)
+mut2<-GetPropOcData("4-25-19",6,2)
+mut3<-GetPropOcData("5-8-19",6,2)
+
+```
+```{r Read data files}
+
+Get3DPropOcData<-function(sampleName){
+  propOcData1<-read.csv(paste0("/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists", sampleName,".csv"),header = T)
+  propOcData1<-propOcData1 %>% mutate(Strain = strain,BioRep = biologicalRep, RunRep = 1)
+  propOcData2<-read.csv(paste0("/Users/jupabago/Documents/Whiteley/PROJECTS/PaSaProject/Spatial paper Data/Microscopy Data/PropOcDataRedSub1/", strain,biologicalRep,"-1000-",2,".csv"),header = T)
+  propOcData2<-propOcData2 %>% mutate(Strain = strain,BioRep = biologicalRep, RunRep = 2)
+  propOcData3<-read.csv(paste0("/Users/jupabago/Documents/Whiteley/PROJECTS/PaSaProject/Spatial paper Data/Microscopy Data/PropOcDataRedSub1/", strain,biologicalRep,"-1000-",3,".csv"),header = T)
+  propOcData3<-propOcData3 %>% mutate(Strain = strain,BioRep = biologicalRep, RunRep = 3)
+  allData<-bind_rows(propOcData1,propOcData2,propOcData3)
+  allData<-allData %>%  mutate(CV = SDPropOcc/MeanPropOcc) %>% mutate(Experiment = experiment)
+  allData<-allData %>% 
+    mutate(Relation = recode(source, "finalGG" = "Pa->Pa","finalRG" = "Sa->Pa","finalRR" = "Sa->Sa","finalGR" = "Pa->Sa")) %>%
+    mutate(Condition = recode(Position, "2" = "Pa:Sa 1:1")) %>%
+    mutate(Interaction = recode(source, "finalGG" = "Self","finalRG" = "Other","finalRR" = "Self","finalGR" = "Other")) %>%
+    mutate(FocusSpecies = recode(source, "finalGG" = "Pa","finalRG" = "Sa","finalRR" = "Sa","finalGR" = "Pa")) %>%
+    mutate(TargetSpecies = recode(source, "finalGG" = "Pa","finalRG" = "Pa","finalRR" = "Sa","finalGR" = "Sa")) %>% 
+    mutate(Time = recode(TimePoint, "0" = "Hour 1","1" = "Hour 2","2" = "Hour 3","3" = "Hour 4","4" = "Hour 5","5" = "Hour 6"))
+  
+  allData<-allData %>% filter(TimePoint<6 & Distance<30)#last distance is always off for some reason =(
+  }
+
+wt1<-Get3DPropOcData("wt", 1, "wt1")
+wt2<-Get3DPropOcData("wt", 2, "wt2")
+wt3<-Get3DPropOcData("wt", 3, "wt3")
+wt3<-wt3 %>% filter(!RunRep==2|!TimePoint==1)
+
+mut1<-Get3DPropOcData("mut", 1, "mut1")
+mut2<-Get3DPropOcData("mut", 2, "mut2")
+mut3<-Get3DPropOcData("mut", 3, "mut3")
+
+combinedData<-bind_rows(wt1,wt2,wt3,mut1,mut2,mut3)
+combinedData<-combinedData %>% filter(RunRep==1)#I just saw that theyr are all the same, so no point on dragging that much data
+```
+```{r checking the replicate runs}
+PlotPropOcAll <- function(df, name) {
+  ggplot()+
+    geom_point(data=df, aes(x=Distance,y=MeanPropOcc, color = Relation, shape = factor(RunRep)),size=4)+
+    geom_errorbar(data=df, aes(x=Distance,ymin=MeanPropOcc-SDPropOcc,ymax=MeanPropOcc+SDPropOcc, color = Relation, linetype = factor(RunRep)),size=4)+
+    facet_wrap(TimePoint~Relation, ncol = 4)+
+    scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    labs(title =name)+
+    theme_cowplot()+
+    background_grid()
+  }
+PlotPropOcAll(wt1,"wt1")
+PlotPropOcAll(wt2,"wt2")
+PlotPropOcAll(wt3,"wt3")
+PlotPropOcAll(mut1,"mut1 ")
+PlotPropOcAll(mut2,"mut2")
+PlotPropOcAll(mut3,"mut3")
+```
+```{r Plot comparison of prop oc between Strains}
+ggplot()+ 
+  geom_point(data = combinedData %>% filter(Relation == "Pa->Pa"),aes(x=Distance,y=MeanPropOcc, color = Strain, shape =factor(BioRep) ),size=4)+
+  scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  facet_wrap( ~ TimePoint, ncol = 3)+
+  labs(title ="Pa->Pa")+  
+  theme_cowplot()
+
+ggplot()+
+  geom_point(data = combinedData %>% filter(Relation == "Sa->Pa"),aes(x=Distance,y=MeanPropOcc, color = Strain, shape =factor(BioRep) ),size=4)+
+  scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  facet_wrap( ~ TimePoint, ncol = 3)+
+  labs(title ="Sa->Pa")+
+  theme_cowplot()
+
+ggplot()+
+  geom_point(data = combinedData %>% filter(Relation == "Pa->Sa"),aes(x=Distance,y=MeanPropOcc, color = Strain, shape =factor(BioRep)),size=4)+
+  facet_wrap( ~ TimePoint, ncol = 3)+
+  scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  labs(title ="Pa->Sa")+
+  theme_cowplot()
+
+ggplot()+
+  geom_point(data = combinedData %>% filter(Relation == "Sa->Sa"),aes(x=Distance,y=MeanPropOcc, color = Strain, shape =factor(BioRep) ),size=4)+
+  facet_wrap( ~ TimePoint, ncol = 3)+
+  scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  labs(title ="Sa->Sa")+
+  theme_cowplot()
+```
+```{r Plot comparing prop oc between time points}
+ggplot()+ 
+  geom_point(data = combinedData %>% filter(Relation == "Pa->Pa"), aes(x=Distance,y=MeanPropOcc, color = TimePoint) ,size=4)+
+  scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  facet_wrap(BioRep ~ Strain, ncol = 2)+
+  labs(title ="Pa->Pa")+
+  theme_cowplot()
+ggplot()+
+  geom_point(data = combinedData %>% filter(Relation == "Sa->Pa"), aes(x=Distance,y=MeanPropOcc, color = TimePoint) ,size=4)+
+  scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  facet_wrap(BioRep ~ Strain, ncol = 2)+
+  labs(title ="Sa->Pa")+
+  theme_cowplot()
+ggplot()+
+  geom_point(data = combinedData %>% filter(Relation == "Pa->Sa"), aes(x=Distance,y=MeanPropOcc, color = TimePoint) ,size=4)+
+  scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  facet_wrap(BioRep ~ Strain, ncol = 2)+
+  labs(title ="Pa->Sa")+
+  theme_cowplot() 
+ggplot()+
+  geom_point(data = combinedData %>% filter(Relation == "Sa->Sa"), aes(x=Distance,y=MeanPropOcc, color = TimePoint) ,size=4)+
+  scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  facet_wrap(BioRep ~ Strain, ncol = 2)+
+  labs(title ="Sa->Sa")+
+  theme_cowplot()
+```
+```{r Calculating empty space}
+combinedDataEmptySpaceStaph<-combinedData %>% filter(source %in% c("finalRG", "finalRR")) %>% group_by(Distance, TimePoint, Strain, BioRep, RunRep) %>% mutate(EmptySpace =1-MeanPropOcc[source == "finalRG"]-MeanPropOcc[source == "finalRR"])
+
+combinedDataEmptySpacePa<-combinedData %>% filter(source %in% c("finalGG", "finalGR")) %>% group_by(Distance, TimePoint, Strain, BioRep, RunRep) %>% mutate(EmptySpace =1-MeanPropOcc[source == "finalGG"]-MeanPropOcc[source == "finalGR"])
+
+combinedDataEmptySpace<-bind_rows(combinedDataEmptySpaceStaph,combinedDataEmptySpacePa)
+```
+```{r Plot Empty space per condition}
+ggplot()+
+  geom_point(data = combinedDataEmptySpace %>% filter(FocusSpecies=="Pa"),aes(x=Distance,y=EmptySpace, color = Strain, shape =factor(BioRep)),size=4)+
+  labs(title ="Empty Space Pa")+
+  facet_wrap(~ TimePoint, ncol = 3)+
+  theme_cowplot()
+
+ggplot()+
+  geom_point(data = combinedDataEmptySpace %>% filter(FocusSpecies=="Sa"),aes(x=Distance,y=EmptySpace, color = Strain, shape =factor(BioRep)),size=4)+
+  labs(title ="Empty Space Sa")+
+  facet_wrap(~ TimePoint, ncol = 3)+
+  theme_cowplot()
+
+```
+```{r Plot Empty space over time}
+ggplot()+
+  geom_point(data = combinedDataEmptySpace %>% filter(FocusSpecies=="Pa"),aes(x=Distance,y=EmptySpace, color = TimePoint),size=4)+
+  labs(title ="Empty Space Pa")+
+  facet_wrap(BioRep~ Strain , ncol = 2)+
+  theme_cowplot()
+
+ggplot()+
+  geom_point(data = combinedDataEmptySpace %>% filter(FocusSpecies=="Sa"),aes(x=Distance,y=EmptySpace, color = TimePoint),size=4)+
+  labs(title ="Empty Space Sa")+
+  facet_wrap(BioRep~ Strain, ncol = 2)+
+  theme_cowplot()
+
+```
+```{r Plot occupancy based on focus}
+ggplot()+
+  geom_line(data = combinedDataEmptySpace %>% filter(FocusSpecies=="Pa" & Strain == "wt"),aes(x=Distance,y=MeanPropOcc, color = Interaction),size=1)+
+  scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  labs(title ="Occupied Space around Pa wt",subtitle = "Over time, per biological replicate")+
+  facet_wrap(BioRep ~ Time , ncol = 6)+
+  theme_minimal_grid()
+
+ggplot()+
+  geom_line(data = combinedDataEmptySpace %>% filter(FocusSpecies=="Pa" & Strain == "mut"),aes(x=Distance,y=MeanPropOcc, color = Interaction),size=1)+
+  scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  labs(title ="Occupied Space around Pa mut",subtitle = "Over time, per biological replicate")+
+  facet_wrap(BioRep ~ Time , ncol = 6)+
+  theme_minimal_grid()
+
+ggplot()+
+  geom_line(data = combinedDataEmptySpace %>% filter(FocusSpecies=="Sa" & Strain == "wt"),aes(x=Distance,y=MeanPropOcc, color = Interaction),size=1)+
+  scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  labs(title ="Occupied Space around Sa wt",subtitle = "Over time, per biological replicate")+
+  facet_wrap(BioRep ~ Time , ncol = 6)+
+  theme_minimal_grid()
+
+ggplot()+
+  geom_line(data = combinedDataEmptySpace %>% filter(FocusSpecies=="Sa" & Strain == "mut"),aes(x=Distance,y=MeanPropOcc, color = Interaction),size=1)+
+  scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  labs(title ="Occupied Space around Sa mut",subtitle = "Over time, per biological replicate")+
+  facet_wrap(BioRep ~ Time , ncol = 6)+
+  theme_minimal_grid()
+
+```
+```{r Plot empty space and proportional occupancy*}
+#This is a good idea, but I will get back to it later @3/25/20
+ggplot()+
+  geom_point(data = combinedDataEmptySpace %>% filter(FocusSpecies=="Sa"),aes(x=Distance,y=MeanPropOcc, color = Strain, shape = Interaction),size=4)+
+  geom_line(data = combinedDataEmptySpace %>% filter(FocusSpecies=="Sa"),aes(x=Distance,y=EmptySpace, color = Strain),size=4)+
+  scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  facet_wrap(~ TimePoint, ncol = 3)+
+  labs(title ="title")+
+  theme_cowplot()
+
+```
+# Statistical exploration of the data.
+Three individual runs were performed independently on each of the experiments. The output of each of them is the mean proportional occupancy and it's SD. So, if the runs follow a normal distribution, their variance should be similar.
+```{r Plot PropOc mean and SD}
+PlotPropOcMeanSD <- function(df, name) {
+  plot1<- ggplot()+
+    geom_linerange(data=df%>% filter(RunRep==1), aes(x=Distance,ymax=MeanPropOcc+SDPropOcc,ymin=MeanPropOcc-SDPropOcc, color = Relation),size=1)+
+    facet_wrap(Time~Relation, ncol = 4)+
+    scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    labs(title =paste0(name, " proportional occupancy mean +/- SD"))+
+    theme_minimal_grid()+
+    background_grid()
+  ggsave(paste0(name,".png"),plot = plot1, width = 17, height = 10)
+  }
+
+PlotPropOcMeanSD(wt1, "wt1")
+PlotPropOcMeanSD(wt2, "wt2")
+PlotPropOcMeanSD(wt3, "wt3")
+PlotPropOcMeanSD(mut1, "mut1")
+PlotPropOcMeanSD(mut2, "mut2")
+PlotPropOcMeanSD(mut3, "mut3")
+
+PlotPropOcAllMeanSD <- function(relation) {
+  plot1<- ggplot()+
+    geom_linerange(data=combinedData %>% filter(Relation ==relation), 
+                   aes(x=Distance,ymax=MeanPropOcc+SDPropOcc,ymin=MeanPropOcc-SDPropOcc, color = Strain, linetype =factor(BioRep), group = Experiment),
+                   position = position_dodge(width =.8), size=.7)+
+    facet_wrap(~Time, ncol = 3)+
+    scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    labs(title =paste0(relation, " proportional occupancy mean +/- SD"), linetype = "Biological Replicate")+
+    theme_minimal_grid()+
+    background_grid()+
+    theme(plot.title = element_text(hjust = 0.5))
+  ggsave(paste0(relation,".png"),plot = plot1, width = 20, height = 10)
+}
+PlotPropOcAllMeanSD("Pa->Pa")
+PlotPropOcAllMeanSD("Pa->Sa")
+PlotPropOcAllMeanSD("Sa->Sa")
+PlotPropOcAllMeanSD("Sa->Pa")
+```
+Another metric used is the coefficient of variation, CV, which is the ratio of the standard deviation to the mean.So, let's also visualize that.
+```{r Plot CV} 
+PlotCVrelation <- function(relation){
+  plot1<-ggplot()+ 
+    geom_point(data=combinedData %>% filter(Relation =="Pa->Pa"), 
+               aes(x=Distance,y = CV, color = Strain, shape = factor(BioRep), group = Experiment),
+               position = position_dodge(width =.8), size=4)+
+    geom_hline(yintercept = 1, linetype = "dashed")+
+    facet_wrap( ~ Time, ncol = 3)+
+    scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    labs(title =paste0(relation, " proportional occupancy Coefficient of variation (SD/mean)"), linetype = "Biological Replicate")+
+    theme_minimal_grid()+
+    background_grid()+ 
+    theme(plot.title = element_text(hjust = 0.5)) 
+  ggsave(paste0(relation,"-CV.eps"),plot = plot1, width = 20, height = 10)
+  ggsave(paste0(relation,"-CV.png"),plot = plot1, width = 20, height = 10)
+  }
+PlotCVrelation("Pa->Pa")
+PlotCVrelation("Pa->Sa")
+PlotCVrelation("Sa->Sa")
+PlotCVrelation("Sa->Pa")
+```
+Importing whole data sets to identify distribution of data
+the chunk below is the only one aplicable to the SaPa chronic wounds project, all the other ones are just for reference
+
+```{r read whole data sets}
+ReadPropOcFile<-function(file){
+    propOcData<-read.csv(file,header = T)
+    fileName<-str_split(basename(file), "\\.")[[1]][1]#this selects the base file name and removes the ".csv"
+    print(paste0("Importing sample ", fileName))
+    attrList<-str_split(fileName,"_")[[1]]
+    propOcData<-propOcData %>% mutate(Condition = attrList[1], TimePoint = attrList[2], Replicate = attrList[3], SampleCode = fileName)
+    return(propOcData)
+    }
+
+propOcDatafolder<-'/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/PropOc Data'
+propOcDatafileList<-list.files(path = propOcDatafolder, full.names = TRUE)
+rawPropOcDataList<-map(propOcDatafileList,ReadPropOcFile)
+rawPropOcData<-bind_rows(rawPropOcDataList)
+rawPropOcData<-rawPropOcData %>% filter(!SampleCode=="mono_d1_01Slim") %>%  filter(!SampleCode=="mono_d1_02Slim")
+
+#QC for data:
+##How much data is just straight up missing?
+#####
+countData<-rawPropOcData %>% group_by(SampleCode, source, Distance) %>% summarize(count = n()) %>% filter(count<1000) %>%ungroup() %>% summarise(MisingTotal = n()*1000-sum(count),TotalMedian = median(count), Mean = mean(count))
+
+countData2<-rawPropOcData %>% group_by(SampleCode, source, Distance) %>% summarize(count = n()) %>% filter(count<1000) %>%ungroup() %>% group_by(SampleCode) %>% summarise(MisingTotal = n()*1000-sum(count),TotalMedian = median(count), Mean = mean(count)) %>% mutate(MissingPercent = (1000-Mean)/1000)
+##How much of the missing data matters?
+
+#first, remove the unnecessary conditions
+removablePropOc <- bind_rows(rawPropOcData %>% filter(Condition == "mono") %>% filter(!source == "finalRR"), #Pa in Sa mono culture
+                       rawPropOcData %>% filter(Condition == "papqsL") %>% filter(!source == "finalGG"),#Sa in all Pa mono cultures
+                       rawPropOcData %>% filter(Condition == "pawt") %>% filter(!source == "finalGG"),
+                       rawPropOcData %>% filter(Condition == "paphz") %>% filter(!source == "finalGG"))
+rawPropOcDataClean <- anti_join(rawPropOcData, removablePropOc)
+
+##then, bad samples
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "mono_d1_03")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "phz_d4_14")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "pqsL_d4_02")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "pqsL_d4_04")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "pqsL_d4_10")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "wt_d4_07")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "papqsL_d4_02")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "pawt_d4_05")
+rawPropOcDataClean<-rawPropOcDataClean %>% filter(!SampleCode == "phz_d4_06")
+
+#Do it again
+countDataClean<-rawPropOcDataClean %>% group_by(SampleCode, source, Distance) %>% summarize(count = n()) %>% filter(count<1000) %>%ungroup() %>% summarise(MisingTotal = n()*1000-sum(count),TotalMedian = median(count), Mean = mean(count))
+
+countDataClean2<-rawPropOcDataClean %>% group_by(SampleCode, source, Distance) %>% summarize(count = n()) %>% filter(count<1000) %>%ungroup() %>% group_by(SampleCode) %>% summarise(MisingTotal = n()*1000-sum(count),TotalMedian = median(count), Mean = mean(count)) %>% mutate(MissingPercent = (1000-Mean)/1000)
+#it got a little better, but not that much...
+#####
+#What are the observations missing?
+#####
+countDistancesALL<-rawPropOcDataClean %>% group_by(SampleCode,Condition, source,Distance) %>% summarise(count = n()) %>% ungroup() %>%group_by(Condition) %>%  mutate(difference = max(count)- count)
+
+countDistancesALLwt<- countDistancesALL %>% filter(Condition=="wt")
+countDistancesALLpqsL<- countDistancesALL %>% filter(Condition=="pqsL")
+
+ggplot()+
+  geom_point(data = countDistancesALLpqsL,aes(x=Distance,y=difference, shape = source, color = SampleCode),size=4)+
+  labs(title ="Prop Oc Analysis Sampling missing by Source and Distance(Original Run")+
+  facet_grid(.~source)+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5))
+#####
+#How much of it is outside the 0 - 1 range?
+#####
+CheckBenchmark<-function(benchmark){
+CheckPropOc<-rawPropOcDataClean %>% filter(PropOc>benchmark|PropOc<0)
+#CheckPropOc<-rawPropOcData %>% filter(PropOc<0)
+percentInbound<-length(CheckPropOc$SampleCode)/length(rawPropOcDataClean$SampleCode)*100
+return(percentInbound)}
+
+CheckBenchmark(1.05)
+CheckBenchmark(1.1)
+CheckBenchmark(1.2)
+CheckBenchmark(1.3)
+CheckBenchmark(1.4)
+CheckBenchmark(1.5)
+CheckBenchmark(1.6)
+CheckBenchmark(1.7)
+CheckBenchmark(1.8)
+CheckBenchmark(1.9)
+
+#the data outside the range should be primarily at really short distances, since this is where the calculation of voxels in the surrounding and sphere of potentially ocuppied space is the largest  
+#I think 1.05 is a good benchmark to observe this trend:
+CheckPropOc<-rawPropOcDataClean %>% filter(PropOc>1.5|PropOc<0) 
+
+ggplot()+
+  geom_jitter(data = CheckPropOc %>% filter(!source == "finalRR") %>% filter(!source == "finalGG") %>% filter(PropOc<1000),aes(x=Distance,y=PropOc, color = source ),size=2, height= .1)+
+  #labs(title ="title")+
+  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+blah<-CheckPropOc %>% filter(!PropOc<0) %>% group_by(Distance) %>% summarise(counts = n())
+ggplot()+
+  geom_point(data = blah,aes(x=Distance,y=counts),size=4)+
+  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+#seems like the data outside the boundaries certainly tends to be at low distances, but the values themselves increase with distance
+#####
+#Add New varaible to the data frame capping the value pf propOc to 1
+
+rawPropOcDataClean$PropOc1= rawPropOcDataClean$PropOc
+rawPropOcDataClean$PropOc1[rawPropOcDataClean$PropOc1>1] = 1
+rawPropOcDataClean$PropOc1[rawPropOcDataClean$PropOc1<0] = 0
+#make new data frame for downstream analysis
+PropOcDataFiltered<-rawPropOcDataClean %>% filter(PropOc<1.5) %>% filter(PropOc>=0)
+
+#Functions to make histograms of proportional occupancy values
+#####
+GetHistograms<-function(inputData){
+data<-inputData%>% group_by(SampleCode,Distance, source) 
+  dataList<-group_split(data)#split data fram into a list of dataframes with a single distance and from a single source
+  histogramList<-map(dataList, HistogramDistance)#run the function on each item of the list created at the top
+  output<-bind_rows(histogramList) #go back to a single dataframe 
+  return(output)
+}
+HistogramDistance <- function(df) {
+  #histogram<- hist(df$PropOc) 
+  histogram<- hist(df$PropOc1, breaks = seq.int(0,1,.01)) 
+  #histogram<- hist(df$PropOc1, breaks = c(0,lseq(.001,1.03,100)))
+  #histogram<- hist(df$PropOc1, breaks = c(0,lseq(.0001,1.03,100)))
+  output<-data.frame(histogram$mids,histogram$counts, histogram$density)
+  colnames(output)<-c("Value", "Frequency", "Density")
+  output<-output %>% mutate(Distance = df$Distance[[1]]) %>% filter(!Frequency==0)
+  output<-output %>% mutate(Source = df$source[[1]])
+  output<-output %>% mutate(Sample = df$SampleCode[[1]])
+  return(output)
+}
+#####
+#Run histograms for data
+propOcHistogramData<-GetHistograms(PropOcDataFiltered)#from here what matters is the density since it is freq/total*#ofbins
+propOcHistogramData<-propOcHistogramData %>% group_by(Sample, Source, Distance) %>% mutate(count = sum(Frequency), NormDensity = Density/100) %>% ungroup()
+#Some Quality control by removing samples with low counts:
+#Quality control for low counts
+lowcounts<-propOcHistogramData %>% filter(count<500)
+lowcountssummary<-lowcounts %>% group_by(Sample, Source) %>% summarize(Lowcounts = n(), meanCounts = mean(count))
+
+lowsamples<-unique(lowcounts$Sample)
+
+ggplot()+
+  geom_point(data = lowcounts,aes(x=Sample,y=count, color = Distance, shape = Source))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+lowCountSamples<-bind_rows(propOcHistogramData %>% filter(Sample == "mono_d1_02"),
+                           propOcHistogramData %>% filter(Sample == "phz_d4_08"),
+                           propOcHistogramData %>% filter(Sample == "wt_d4_11") %>% filter(Source == "finalRG"))
+propOcHistogramData <- anti_join(propOcHistogramData, lowCountSamples)
+                               
+
+#plot distributions
+PlotAllPropOcData <- function(sample ) {
+  ggplot()+ 
+    geom_point(data = propOcHistogramData %>% filter(Sample ==sample),aes(x=Value,y=NormDensity, color = Distance),size=2, shape = 1)+
+    scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    scale_color_gradientn(colours = rainbow(5))+
+    labs(title =sample)+
+    facet_wrap(.~Source)+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+}
+PlotAllPropOcData("wt_d4_05")#looks cool, so let's keep going...
+
+#now calculate the maximum frequency
+#####
+propOcMaxDensity<-propOcHistogramData %>% 
+    group_by(Sample, Distance, Source)%>% 
+    mutate(MaxDensity = max(NormDensity)) %>% 
+    mutate(DensityCh = ifelse(Density ==max(Density), 1, 0 )) %>% filter(DensityCh==1) %>% ungroup()#find max density, check where it matches
+  propOcMaxDensityDoubles<-propOcMaxDensity %>% group_by(Sample,Distance, Source) %>% mutate(DoubledValues = sum(DensityCh)) %>% filter (DoubledValues>1)#this is just to find which values were repeated
+
+  PlotMaxDensities <- function(sample) {
+  ggplot()+
+    geom_jitter(data = propOcMaxDensity %>% filter(Sample ==sample),aes(x=Value, y=Density,color = Distance),size=2)+
+    labs(title ="Maximum Density")+
+    scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    facet_wrap( ~ Source, ncol = 2)+
+    scale_color_gradientn(colours = rainbow(5))+
+    #scale_shape_manual(values=c(0,1,2, 15,16,17))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+}
+PlotMaxDensities("pqsL_d4_03")
+#####
+#maximum distribution isn't super representative, so for the distribution, I calculated the value at which 50% of the population is found 
+
+#Median distribution
+#####
+getDeathCurve<-function(df){
+  currentDensity = 0
+  for (i in 1 : nrow(df)){
+    addeddensity<-1-currentDensity
+    df[i,9]<-addeddensity
+    df[i,10]<-currentDensity
+    currentDensity = currentDensity+df[i,8]
+  }
+  colnames(df)<-c("Value","Frequency","Density", "Distance", "Source","Sample", "count", "NormDensity", "Decay", "currentDens")
+  df<-df %>% mutate (normDecay = (Decay - min(Decay)) / (max(Decay) - min(Decay)), DeltaDens = abs(Decay-currentDens))
+  return(df)
+  }
+GetPercentiles<-function(input){
+  df<-input %>% group_by(Sample, Distance, Source)
+  yas<- group_split(df)
+  mappedData<-map(yas, getDeathCurve)
+  boundData<-bind_rows(mappedData)
+return(boundData)}
+
+#Calculate the cumulative density
+testGetPercentiles<-GetPercentiles(propOcHistogramData %>% filter(Sample == "wt_d1_05"))#test case for sample wt_d1_05
+propOcDensityData<-GetPercentiles(propOcHistogramData)#all data
+
+#Calculate the value at half density
+test50Percentile<-testGetPercentiles %>% group_by(Source, Sample, Distance) %>%filter(DeltaDens == min(DeltaDens))#test case for sample wt_d1_05
+propOcMidDensity<-propOcDensityData %>% group_by(Source, Sample, Distance) %>%filter(DeltaDens == min(DeltaDens))#all data
+
+PlotPercentiles <- function(df) {
+  ggplot()+
+    geom_point(data = df,aes(y=Value, color=normDecay,x = Distance, shape = Sample),size=2)+
+    #geom_pointrange(data = df,aes(x = Distance,y=meanValue,ymax=meanValue+SdValue,ymin=meanValue-SdValue, color=Strain),size=2)+
+    labs(title ="50 percentile Density")+
+    #scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    #scale_x_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    facet_wrap( ~ Source, ncol = 2)+
+    scale_color_gradientn(colours = rainbow(5))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+  }
+PlotPercentiles(test50Percentile)#test case for sample wt_d1_05
+PlotPercentiles(propOcMidDensity %>% filter(Sample == "wt_d4_05", Source == "finalGR"))
+
+#Clean up data for plotting and doing stats
+##Recover conditions
+
+PropOcDataFiltered1<-PropOcDataFiltered %>% group_by(Condition,TimePoint,SampleCode) %>% summarise(None = n()) %>% mutate(Sample = SampleCode)
+
+propOcMidDensitylabeled <-merge(propOcMidDensity,PropOcDataFiltered1)
+
+##Make them factors
+propOcMidDensitylabeled$Condition <- factor(propOcMidDensitylabeled$Condition, levels = c("mono", "pawt","papqsL", "paphz", "wt", "pqsL", "phz"),labels = c('Sa mono', 'Pa wt mono','pqsL mono','phz mono','wt co', 'pqsL co', 'phz co'))
+propOcMidDensitylabeled$TimePoint <- factor(propOcMidDensitylabeled$TimePoint, levels = c("d1", "d4"),labels = c('Day 1','Day 4'))
+
+propOcMidDensitylabeled<-propOcMidDensitylabeled%>% mutate(Relation = recode(Source, "finalGG" = "Pa->Pa","finalRG" = "Sa->Pa","finalRR" = "Sa->Sa","finalGR" = "Pa->Sa"))
+
+propOcMidDensitylabeled<-propOcMidDensitylabeled%>% mutate(Culture = recode(Condition, 'Sa mono' = "mono", 'Pa wt mono' = "mono",'pqsL mono'= "mono",'phz mono'= "mono",'wt co'= "co", 'pqsL co'= "co", 'phz co'= "co"))
+
+propOcMidDensitylabeled<-propOcMidDensitylabeled%>% mutate(Strain = recode(Condition, 'Sa mono' = "Sa", 'Pa wt mono' = "wt",'pqsL mono'= "pqsL",'phz mono'= "phz",'wt co'= "wt", 'pqsL co'= "pqsL", 'phz co'= "phz"))
+
+propOcMidDensityStats<-propOcMidDensitylabeled %>% ungroup() %>% group_by(Condition,Culture,Strain,TimePoint, Distance, Relation) %>% summarize(meanValue = mean(Value), sdValue = sd(Value), medianValue = median(Value))
+
+ggplot()+
+    geom_point(data = propOcMidDensityStats %>% filter(Relation== "Pa->Sa"),aes(y=meanValue, x = Distance,color=Condition, shape = "Mean"),size=2)+
+    geom_point(data = propOcMidDensityStats %>% filter(Relation== "Pa->Sa"),aes(y=medianValue, x = Distance,color=Condition,shape = "Median"),size=2)+
+    labs(title ="mean 50 percentile Density")+
+    facet_grid(Relation ~ TimePoint)+
+    scale_color_brewer(palette = "Set1")+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+
+ggplot()+#Pa->Pa
+    geom_point(data = propOcMidDensityStats %>% filter(Relation== "Pa->Pa"),aes(y=meanValue, x = Distance,color=Culture, shape = "Mean"),size=2)+
+    geom_point(data = propOcMidDensityStats %>% filter(Relation== "Pa->Pa"),aes(y=medianValue, x = Distance,color=Culture,shape = "Median"),size=2)+
+    labs(title ="mean 50 percentile Density")+
+    facet_grid(Strain ~ TimePoint)+
+    scale_color_brewer(palette = "Set1")+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+
+#Calculate Enrichment
+propOcEnrichment<- propOcMidDensitylabeled %>% group_by(SampleCode,Relation)%>%
+  select(Value, Density, Distance, Relation,Sample, Strain,TimePoint, Condition, Culture, Strain,SampleCode) %>% mutate(Enrichment = max(Value)) %>%
+  mutate(EnrichmentCh = ifelse(Enrichment == Value, 1, 0 )) %>% filter(EnrichmentCh==1) %>% 
+  mutate(DoubledValues = sum(EnrichmentCh)) %>% ungroup()#find max
+propOcEnrichment$SampleCode<-as.factor(propOcEnrichment$SampleCode)#make samples a factor
+
+metaData.df <-read.csv('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/images metadata.csv', header = TRUE)
+metaData.df$SampleCode<-as.factor(metaData.df$SampleCode)
+
+
+metaData.df<-metaData.df %>% select(SampleCode, mouse, Position, size, Region, Zdim, xyDim,xySize)
+pOEnrMeta<-metaData.df %>%  merge(propOcEnrichment, by = "SampleCode")
+
+#Plotting Enrichment per Relation
+PlotEnrichment<-function(relation){
+  ggplot()+
+    geom_point(data = pOEnrMeta %>% filter(Relation == relation),aes(y=Distance,x = Sample,shape = Region, color =Condition),size=2)+
+    geom_point(data = pOEnrMeta %>% filter(Relation == relation),aes(y=WmeanDist, x = Sample, shape = Region), color ="BLACK",size=2)+
+    labs(title =paste("50 percentile Enrichment", relation))+
+    facet_grid(.~TimePoint,scales = "free", space = "free")+
+    #scale_color_gradientn(colours = rainbow(5))+
+    #scale_shape_manual(values=c(0,1,2, 15,16,17))+
+    ylim(0,30)+
+    theme_cowplot()+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),plot.title = element_text(hjust = 0.5))+
+    panel_border() 
+}
+PlotEnrichment("Pa->Sa")
+PlotEnrichment("Sa->Pa")
+PlotEnrichment("Sa->Sa")
+PlotEnrichment("Pa->Pa")
+
+#It's unclear how to deal with the issue of multiple enrichment distances, but I think doing a weighted mean makes the most sense:
+pOEnrMetaClean<-pOEnrMeta %>% group_by(SampleCode,Condition,TimePoint, Region, Relation)%>%summarise(WmeanDist =weighted.mean(Distance, Density))
+#now calculate the Mean per condition:
+pOEnrMetaStatsRegion<-pOEnrMetaClean %>% group_by(Condition,TimePoint, Region, Relation) %>%
+  summarise(meanED = mean(WmeanDist),medianED = median(WmeanDist), SDED = sd(WmeanDist), SEED = std.error(WmeanDist),per25 = quantile(WmeanDist, .25), per75 = quantile(WmeanDist, .75))
+
+pOEnrMetaStats<-pOEnrMetaClean %>% group_by(Condition,TimePoint, Relation) %>%
+  summarise(meanED = mean(WmeanDist),medianED = median(WmeanDist), SDED = sd(WmeanDist), SEED = std.error(WmeanDist), per25 = quantile(WmeanDist, .25), per75 = quantile(WmeanDist, .75))
+
+
+
+#plot mean, weighted mean Enrichment distance from 50 percentile PO
+##First using region
+PlotMeanEnrichment50percent<-function(df1,df2){
+  ggplot()+
+    geom_pointrange(data = df1,aes(y=meanED,ymax=meanED+SEED,ymin=meanED-SEED, x = Condition,shape = Region),position = position_dodge(width = .5),size = .7)+
+  geom_point(data = df2,aes(y=WmeanDist,x = Condition, group = Region),position = position_dodge(width = .5),size=1, shape = 1)+
+    labs(y = expression(atop("Enrichment distance ("*mu*"m)",paste(italic("P. aeruginosa ") %->% italic("S. aureus"))))) +
+    #facet_grid(.~Relation,scales = "free", space = "free")+
+    theme_cowplot()+
+    #theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),plot.title = element_text(hjust = 0.5))+
+    theme(plot.title = element_text(hjust = 0.5),
+          strip.text = element_text(size = 12, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facets
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"))
+}
+PlotMeanEnrichment50percent(pOEnrMetaStatsRegion %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"),
+                            pOEnrMetaClean %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"))
+
+PlotMedianEnrichment50percent<-function(df1,df2){
+  ggplot()+
+    geom_pointrange(data = df1,aes(y=medianED,ymax=per25,ymin=per75, x = Condition,shape = Region),position = position_dodge(width = .5),size = .7)+
+  geom_jitter(data = df2,aes(y=WmeanDist,x = Condition),width = .5, height = 0,size=1, shape = 1)+
+    labs(y = expression(atop("Enrichment distance ("*mu*"m)",paste(italic("P. aeruginosa ") %->% italic("S. aureus"))))) +
+    #facet_grid(.~Relation,scales = "free", space = "free")+
+    theme_cowplot()+
+    #theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),plot.title = element_text(hjust = 0.5))+
+    theme(plot.title = element_text(hjust = 0.5),
+          strip.text = element_text(size = 12, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facets
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"))
+}
+PlotMedianEnrichment50percent(pOEnrMetaStatsRegion %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"),
+                            pOEnrMetaClean %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"))
+#then without region
+PlotMedianEnrichment50percentNRegion<-function(df1,df2){
+  ggplot()+
+    geom_pointrange(data = df1,aes(y=medianED,ymax=per25,ymin=per75, x = Condition),size = .7)+
+  geom_jitter(data = df2,aes(y=WmeanDist,x = Condition),width = .2, height = 0,size=1, shape = 1)+
+    labs(y = expression(atop("Enrichment distance ("*mu*"m)",paste(italic("P. aeruginosa ") %->% italic("S. aureus"))))) +
+    #facet_grid(.~Relation,scales = "free", space = "free")+
+    theme_cowplot()+
+    #theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),plot.title = element_text(hjust = 0.5))+
+    theme(plot.title = element_text(hjust = 0.5),
+          strip.text = element_text(size = 12, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facets
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"))
+}
+PlotMeanEnrichment50percentNRegion<-function(df1,df2){
+  ggplot()+
+    geom_pointrange(data = df1,aes(y=meanED,ymax=meanED+SEED,ymin=meanED-SEED, x = Condition),size = .7)+
+  geom_jitter(data = df2,aes(y=WmeanDist,x = Condition, group = Region),width = .2, height = 0,size=1, shape = 1)+
+    labs(y = expression(atop("Enrichment distance ("*mu*"m)",paste(italic("P. aeruginosa ") %->% italic("S. aureus"))))) +
+    #facet_grid(.~Relation,scales = "free", space = "free")+
+    theme_cowplot()+
+    #theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),plot.title = element_text(hjust = 0.5))+
+    theme(plot.title = element_text(hjust = 0.5),
+          strip.text = element_text(size = 12, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facets
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"))
+}
+PlotMeanEnrichment50percentNRegion(pOEnrMetaStats %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"),
+                            pOEnrMetaClean %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"))
+PlotMedianEnrichment50percentNRegion(pOEnrMetaStats %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"),
+                            pOEnrMetaClean %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"))
+
+#original figure 
+ggplot()+
+    geom_pointrange(data = pOEnrMetaStats,aes(y=meanED,ymax=meanED+SEED,ymin=meanED-SEED, x = Condition),position = position_dodge(width = .5))+
+  geom_jitter(data = pOEnrMetaClean,aes(y=WmeanDist,x = Condition),size=1, shape = 1, height = 0, width = .2)+
+    labs(y = expression("Enrichment distance ("*mu*"m)")) +
+    facet_grid(TimePoint~Relation,scales = "free", space = "free")+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5),
+          strip.text = element_text(size = 12, margin = margin(.1,0,.1,0, "cm")),#this is for the facets
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"))+
+    panel_border() 
+
+ggplot()+
+    geom_pointrange(data = pOEnrMetaStatsRegion,aes(y=meanED,ymax=meanED+SEED,ymin=meanED-SEED, shape = Region,x = Condition),
+                    position = position_dodge(width = .5))+
+    geom_point(data = pOEnrMetaClean,aes(y=WmeanDist,x = Condition, group = Region),position = position_dodge(width = .5),size=1, shape = 1)+
+    labs(y = expression("Enrichment distance ("*mu*"m)")) +
+    facet_grid(TimePoint~Relation,scales = "free", space = "free")+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5),
+          strip.text = element_text(size = 12,margin = margin(.1,0,.1,0, "cm")),#this is for the facets
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"))+
+    panel_border() 
+
+
+```
+
+```{r Original Whole PropOc frequency functions from mBio Paper -DONE}
+GetAllHistPropOc <- function(df, timepoint){
+  data.GG<-GetHistPropOc(df, timepoint, "finalGG")
+  data.RG<-GetHistPropOc(df, timepoint, "finalRG")
+  data.RR<-GetHistPropOc(df, timepoint, "finalRR")
+  data.GR<-GetHistPropOc(df, timepoint, "finalGR")
+  allData<- bind_rows(data.GG,data.RR,data.RG,data.GR)
+return(allData)
+}
+
+GetHistPropOc <- function(df,timePoint, sources) {
+  data<-df %>%  filter(TimePoint==timePoint) %>% filter(source==sources) %>% group_by(Distance, source) %>% filter(PropOc <1.02)
+  dataList<-group_split(data)
+  histogramList<-map(dataList, HistogramDistance)
+  output<-bind_rows(histogramList)
+  output<-output %>% mutate(Source = sources)
+  return(output)
+}
+HistogramDistance <- function(df) {
+  #histogram<- hist(df$PropOc, breaks = seq.int(0,1.02,.01)) 
+  #histogram<- hist(df$PropOc) 
+  #histogram<- hist(df$PropOc, breaks = c(0,lseq(.001,1.03,100)))
+  histogram<- hist(df$PropOc, breaks = c(0,lseq(.0001,1.03,100)))
+  output<-data.frame(histogram$mids,histogram$counts, histogram$density)
+  colnames(output)<-c("Value", "Frequency", "Density")
+  output<-output %>% mutate(Distance = df$Distance[[1]]) %>% filter(!Frequency==0)
+  output<-output %>% mutate(Source = df$source[[1]]) 
+  return(output)
+}
+
+#Get all of the distributions
+
+```
+
+```{r Whole PropOc frequency Figures -DONE}
+PlotAllPropOcData <- function(df, relation ) {
+  ggplot()+ 
+    geom_point(data = df %>% filter(Source == relation),aes(x=Value,y=Frequency, color = Distance),size=2)+
+    scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    #scale_x_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    #labs(title =paste( relation, timepoint))+
+    #scale_color_viridis(option = "D")+
+    scale_color_gradientn(colours = rainbow(5))+
+    xlim(0,1)+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+  #name<-paste0(relation, ".hour", timepoint,".png")
+  #ggsave(paste0(name),plot = plot, width = 17, height = 10)
+} 
+ 
+PlotAllPropOcData(testReadPropOc, "finalRR")
+PlotAllPropOcData(testReadPropOc1, "finalRR")
+PlotAllPropOcData(testReadPropOc2, "finalRR")
+PlotAllPropOcData(testReadPropOc3, "finalRR")
+ 
+#Honestly, they all look pretty much the same...
+#let's try doing the bins in an exponential function...
+PlotAllPropOcDatalog <- function(df, timepoint, relation ) {
+  plot<-ggplot()+ 
+    geom_point(data = df,aes(x=Value,y=Frequency, color = Distance),size=2)+
+    scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)),limits = (c(1,1001)))+
+    #scale_x_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    scale_x_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)),limits = (c(0.0005,1)))+
+    labs(title =paste( relation, timepoint))+ 
+    #scale_color_viridis(option = "D")+
+    scale_color_gradientn(colours = rainbow(5))+
+    #xlim(0,1)+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+  name<-paste0(relation, ".hour", timepoint,"(log).png")
+  ggsave(paste0(name),plot = plot, width = 17, height = 10) 
+}
+
+PlotAllPropOcDatalog(wt1.1Whole.5log %>% filter (Source == "finalRG"), 5, "Wt 1-1 SA->PA")
+PlotAllPropOcDatalog(wt2.1Whole.5log %>% filter (Source == "finalRG"), 5, "Wt 2-1 SA->PA")
+PlotAllPropOcDatalog(wt3.1Whole.5log %>% filter (Source == "finalRG"), 5, "Wt 3-1 SA->PA")
+
+PlotAllPropOcDatalog(mut1.1Whole.5log %>% filter (Source == "finalRG"), 5, "Mut1-1 SA->PA")
+PlotAllPropOcDatalog(mut2.1Whole.5log %>% filter (Source == "finalRG"), 5, "Mut2-1 SA->PA")
+PlotAllPropOcDatalog(mut3.1Whole.5log %>% filter (Source == "finalRG"), 5, "Mut3-1 SA->PA")
+
+PlotAllPropOcDatalog(wt1.1Whole.5log %>% filter (Source == "finalGR"), 5, "Wt 1-1 PA->SA")
+PlotAllPropOcDatalog(wt2.1Whole.5log %>% filter (Source == "finalGR"), 5, "Wt 2-1 PA->SA")
+PlotAllPropOcDatalog(wt3.1Whole.5log %>% filter (Source == "finalGR"), 5, "Wt 3-1 PA->SA")
+ 
+PlotAllPropOcDatalog(mut1.1Whole.5log %>% filter (Source == "finalGR"), 5, "Mut1-1 PA->SA")
+PlotAllPropOcDatalog(mut2.1Whole.5log %>% filter (Source == "finalGR"), 5, "Mut2-1 PA->SA")
+PlotAllPropOcDatalog(mut3.1Whole.5log %>% filter (Source == "finalGR"), 5, "Mut3-1 PA->SA")
+
+```
+
+```{r Whole PropOc Data wrangling -DONE}
+#So, I think the first thing to do would be to get a "mode", or the highest value for frequency of proportional occupancy per distance.
+#at this point I can see at least if the zone of interest is the same for every sample.
+
+GetMaxDensity <- function(df) {#this one is essentially the same as the one below, but this one doesnt allow repeated max density values
+  df.summary<-df %>% mutate(Density = Frequency/1000) %>% #this is to make it be from 0 to 1
+    group_by(Distance, Source) %>% select(Value, Distance,Density, Source) %>% summarise(DensestValue = Value [Density ==max(Density)], MaxDensity = max(Density))
+  return(df.summary)
+}
+
+DensityCheck <- function(df) {
+  df.summary<-df %>% 
+    mutate(Density = Frequency/1000) %>% #this is to make it be from 0 to 1
+    group_by(Distance, Source) %>% select(Value, Distance,Density, Source) %>% 
+    mutate(MaxDensity = max(Density)) %>% 
+    mutate(DensityCh = ifelse(Density ==max(Density), 1, 0 )) %>% filter(DensityCh==1) %>% ungroup()#find max density, check where it matches
+  #df.summary<-df.summary %>% group_by(Distance, Source) %>% mutate(DoubledValues = sum(DensityCh))#this is just to find which values were repeated
+  return(df.summary)
+}
+
+ProcessDensities <- function(histograms) {
+histogramNames<- c("wt1.1","wt2.1","wt3.1","mut1.1","mut2.1","mut3.1")
+mappedDensities<-map(histograms,DensityCheck)
+namedMappedDensities<-map2(mappedDensities, histogramNames, ~.x %>% mutate(Sample = .y))
+allDensities<-bind_rows(namedMappedDensities)
+allDensities<-allDensities %>% ungroup() %>% 
+  mutate(Strain = recode(allDensities$Sample, wt1.1="wt",wt2.1="wt",wt3.1="wt",mut1.1="mut",mut2.1="mut",mut3.1="mut"))
+return(allDensities)}
+
+histograms<- list(wt1.1Whole.5,wt2.1Whole.5,wt3.1Whole.5,mut1.1Whole.5,mut2.1Whole.5,mut3.1Whole.5)
+histogramslog<- list(wt1.1Whole.5log,wt2.1Whole.5log,wt3.1Whole.5log,mut1.1Whole.5log,mut2.1Whole.5log,mut3.1Whole.5log)
+histogramslog2<- list(wt1.1Whole.5log2,wt2.1Whole.5log2,wt3.1Whole.5log2,mut1.1Whole.5log2,mut2.1Whole.5log2,mut3.1Whole.5log2)
+
+allDensitiesFunctions<-ProcessDensities(histograms)
+allDensitiesLog<-ProcessDensities(histogramslog)
+allDensitiesLog2<-ProcessDensities(histogramslog2)
+```
+
+```{r Max Density Figures -DONE}
+PlotMaxDensities <- function(df) {
+  ggplot()+
+    geom_jitter(data = df,aes(y=Value, color=Density,x = Distance, shape = Sample),size=2)+
+    labs(title ="Maximum Density")+
+    scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    #scale_x_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    facet_wrap( ~ Source, ncol = 2)+
+    scale_color_gradientn(colours = rainbow(5))+
+    scale_shape_manual(values=c(0,1,2, 15,16,17))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+}
+PlotMaxDensities(allDensities)
+PlotMaxDensities(allDensitiesFunctions %>% filter(Source=="finalRG"))
+PlotMaxDensities(allDensitiesLog)
+PlotMaxDensities(allDensitiesLog2)
+```
+
+#Calculating 50 percentile density.
+```{r death curves Functions and data -DONE}
+getDeathCurve<-function(df){
+  totalFrequency = sum(df$Frequency)
+  currentFrequency = 0
+  for (i in 1 : nrow(df)){
+    addedFrequency<-totalFrequency-currentFrequency
+    df[i,6]<-addedFrequency
+    currentFrequency = currentFrequency+df[i,2]
+  }
+  colnames(df)<-c("Value","Frequency","Density", "Distance", "Source","Decay")
+  df<-df %>% mutate (normDecay = 100*(Decay - min(Decay)) / (max(Decay) - min(Decay)))
+  return(df)
+  }
+processData<-function(df){
+  allData<-df %>% group_by(Distance, Source)
+  yas<- group_split(allData)
+  mappedData<-map(yas, getDeathCurve)
+  boundData<-bind_rows(mappedData)
+}
+GetPercentiles<-function(histograms){
+  histogramNames<- c("wt1.1","wt2.1","wt3.1","mut1.1","mut2.1","mut3.1")
+  mappedDensities<-map(histograms,processData)
+  namedMappedDensities<-map2(mappedDensities, histogramNames, ~.x %>% mutate(Sample = .y))
+  allDensities<-bind_rows(namedMappedDensities)
+  allDensities<-allDensities %>% ungroup() %>% 
+    mutate(Strain = recode(allDensities$Sample, wt1.1="wt",wt2.1="wt",wt3.1="wt",mut1.1="mut",mut2.1="mut",mut3.1="mut"))
+return(allDensities)}
+
+PlotPercentiles <- function(df) {
+  ggplot()+
+    geom_point(data = df,aes(y=Value, color=Percentile50,x = Distance, shape = Sample),size=2)+
+    #geom_pointrange(data = df,aes(x = Distance,y=meanValue,ymax=meanValue+SdValue,ymin=meanValue-SdValue, color=Strain),size=2)+
+    labs(title ="50 percentile Density")+
+    scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    #scale_x_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    facet_wrap( ~ Source, ncol = 2)+
+    scale_color_gradientn(colours = rainbow(5))+
+    scale_shape_manual(values=c(0,1,2, 15,16,17))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+  }
+
+allDeathCurvesLog2<-GetPercentiles(histogramslog2)
+#there are, I believe, at least 3 ways to find the 50 percentile. one of them is finidng the closest value, regardless of where it comes from, whether it is higher or lower than 50 percentile. The other two are either taking the closest to 50, either exclusively larger or exclusively smaller than that. That's why there are 3 ways of doing this here:
+
+#this is the closest to absolute value 50
+allDeathCurvesLog2midAbs <- allDeathCurvesLog2 %>% group_by(Sample, Distance, Source) %>% 
+  mutate(Percentile50 = min(abs(normDecay - 50)))%>% 
+  mutate(DensityCh = ifelse(Percentile50 ==abs(normDecay - 50), 1, 0 )) %>% filter(DensityCh==1) %>% mutate(DoubledValues = sum(DensityCh)) %>% ungroup()#find max density, check where it matches
+
+#this is coming from the highest value
+allDeathCurvesLog2topAbs <- allDeathCurvesLog2 %>% group_by(Sample, Distance, Source) %>% 
+  mutate(Percentile50 = (normDecay - 50)) %>% filter (Percentile50>0) %>% filter(Percentile50==min(Percentile50)) %>%  
+  mutate(DensityCh = ifelse(Percentile50 ==(normDecay - 50), 1, 0 )) %>% filter(DensityCh==1) %>% 
+  mutate(DoubledValues = sum(DensityCh)) %>% ungroup()#find max density, check where it matches
+
+#this is coming from the lowest value
+allDeathCurvesLog2bottomAbs <- allDeathCurvesLog2 %>% group_by(Sample, Distance, Source) %>% 
+  mutate(Percentile50 = (50 -normDecay)) %>% filter (Percentile50>0) %>% filter(Percentile50==min(Percentile50)) %>%  
+  mutate(DensityCh = ifelse(Percentile50 ==(50 - normDecay), 1, 0 )) %>% filter(DensityCh==1) %>% 
+  mutate(DoubledValues = sum(DensityCh)) %>% ungroup()#find max density, check where it matches
+
+#Plotting and comparing all 3
+PlotPercentiles(allDeathCurvesLog2midAbs)
+PlotPercentiles(allDeathCurvesLog2topAbs)
+PlotPercentiles(allDeathCurvesLog2bottomAbs)
+#they all look fine, so I'll just stick with the first one
+
+#this looks kind of ok... what is the mean and sd?
+allDeathCurvesLog2midAbsStats<-allDeathCurvesLog2midAbs %>% group_by(Strain, Distance, Source) %>% mutate(LogValue = log10(Value)) %>% mutate(meanValue = mean(Value), sdValue = sd(Value), meanLogValue = mean(LogValue),sdLogValue = sd(LogValue))
+PlotPercentiles(allDeathCurvesLog2midAbsStats)
+
+ggplot()+#linear
+    #geom_point(data = df,aes(y=Value, color=Percentile50,x = Distance, shape = Sample),size=2)+
+    geom_pointrange(data = allDeathCurvesLog2midAbsStats,aes(x = Distance,y=meanValue,ymax=meanValue+sdValue,ymin=meanValue-sdValue, color=Strain),size=.5)+
+    labs(title ="50 percentile Density")+
+    scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    #scale_x_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    facet_wrap( ~ Source, ncol = 2)+
+    #scale_color_gradientn(colours = rainbow(5))+
+    #scale_shape_manual(values=c(0,1,2, 15,16,17))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+
+allDeathCurvesLog2midAbsStats<-allDeathCurvesLog2midAbsStats%>% mutate(Relation = recode(Source, "finalGG" = "Pa->Pa","finalRG" = "Sa->Pa","finalRR" = "Sa->Sa","finalGR" = "Pa->Sa"))
+ggplot()+#log transform
+  geom_pointrange(data = allDeathCurvesLog2midAbsStats,aes(x = Distance,y=meanLogValue,ymax=meanLogValue+sdLogValue,ymin=meanLogValue-sdLogValue, color=Strain),size=.5)+
+  facet_wrap( ~ Relation, ncol = 2)+
+  scale_color_grey(name = "Strain", labels = c( "HQNO-","Wild Type"))+  
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+#Enrichment (distance at highest proportional occupancy) 
+```{r Enrichment}
+#find the max proportional occupancy value from the 50 percentile
+
+allDeathCurvesLog2midAbsEnrichment<- allDeathCurvesLog2midAbs %>% group_by(Sample, Source)%>%
+  select(Value, Distance, Source,Sample, Strain, Percentile50) %>% mutate(Enrichment = max(Value)) %>%
+  mutate(EnrichmentCh = ifelse(Enrichment == Value, 1, 0 )) %>% filter(EnrichmentCh==1) %>% 
+  mutate(DoubledValues = sum(EnrichmentCh)) %>% ungroup()#find max
+
+PlotEnrichment <- function(df) {
+ggplot()+
+    geom_point(data = df,aes(y=Distance, x = Sample, color = Enrichment, shape = Sample),size=2)+
+    labs(title ="50 percentile Enrichment")+
+    facet_wrap( ~ Source, ncol = 2)+
+    scale_color_gradientn(colours = rainbow(5))+
+    scale_shape_manual(values=c(0,1,2, 15,16,17))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+}
+
+PlotDataEnrichmentEmphasis <- function(wholeData, EnrichmentData) {
+ggplot()+#including rest of the data
+  geom_point(data = wholeData,aes(y=Value, color=Percentile50,x = Distance, shape = Sample),size=2)+
+  geom_point(data = EnrichmentData,aes(y=Value, color=Percentile50,x = Distance, shape = Sample),size=5)+
+  labs(title ="50 percentile Density (Enrichment emphasis)")+
+  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  #scale_x_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  facet_wrap( ~ Source, ncol = 2)+
+  scale_color_gradientn(colours = rainbow(5))+
+  scale_shape_manual(values=c(0,1,2, 15,16,17))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5))
+}
+
+PlotEnrichment(allDeathCurvesLog2midAbsEnrichment)
+PlotDataEnrichmentEmphasis(allDeathCurvesLog2midAbs,allDeathCurvesLog2midAbsEnrichment)
+
+#That looks like a lot of the values are just at 0.5 distance, which I dont really care, I can make another argument about direct contact, so I'll filter those out...
+allDeathCurvesLog2midAbsEnrichment2<-allDeathCurvesLog2midAbs %>% filter(!Distance ==0.5)%>% 
+  group_by(Sample, Source) %>% select(Value, Distance, Source,Sample, Strain, Percentile50) %>% mutate(Enrichment = max(Value)) %>%
+  mutate(EnrichmentCh = ifelse(Enrichment == Value, 1, 0 )) %>% filter(EnrichmentCh==1) %>% mutate(DoubledValues = sum(EnrichmentCh)) %>% ungroup()#find max
+
+PlotEnrichment(allDeathCurvesLog2midAbsEnrichment2)
+PlotDataEnrichmentEmphasis(allDeathCurvesLog2midAbs,allDeathCurvesLog2midAbsEnrichment2)
+
+#This looks a little better... now get the mean per condition
+allDeathCurvesLog2midAbsEnrichment2<-allDeathCurvesLog2midAbsEnrichment2 %>% group_by(Source, Sample) %>% mutate(EnrichmentDistance = mean(Distance)) %>% ungroup() %>% group_by(Source, Strain) %>% mutate(meanEnrichment = mean(EnrichmentDistance), sdEnrichment = sd(EnrichmentDistance))
+
+allDeathCurvesLog2midAbsEnrichment2<-allDeathCurvesLog2midAbsEnrichment2 %>% mutate(Relation = recode(Source, "finalGG" = "Pa->Pa","finalRG" = "Sa->Pa","finalRR" = "Sa->Sa","finalGR" = "Pa->Sa"))
+
+#this is the original figure I sent to Marvin
+ggplot()+
+  geom_point(data = allDeathCurvesLog2midAbsEnrichment2,aes(y=meanEnrichment, x = Strain, color = Strain),size=4)+
+  geom_errorbar(data = allDeathCurvesLog2midAbsEnrichment2,
+                aes(ymin = meanEnrichment-sdEnrichment,ymax = meanEnrichment+sdEnrichment, x = Strain, color = Strain),size=1)+
+  geom_jitter(data = allDeathCurvesLog2midAbsEnrichment2,aes(y=Distance, x = Strain, color = Strain, shape = Sample),size=2)+
+  facet_wrap( ~ Relation, ncol = 2)+
+  scale_shape_manual(values=c(0,1,2, 15,16,17))+
+  guides(shape = FALSE)+
+  scale_color_grey(name = "Strain", labels = c("HQNO-","Wild Type"))+  
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5))
+#Now I have to remove focus of Pa since there are too many of them
+enrichmentDataFinal<-allDeathCurvesLog2midAbsEnrichment2 %>% filter(Relation %in% c("Sa->Pa", "Sa->Sa"))
+enrichmentDataFinal$Strain <- factor(enrichmentDataFinal$Strain, levels = c("wt", "mut"))
+```
+
+```{r final figure for enrichment}
+sa.paPlot<-ggplot()+
+  geom_point(data = enrichmentDataFinal %>% filter(Relation == "Sa->Pa"),aes(y=meanEnrichment, x = Strain, shape = Strain),size=4)+
+  geom_errorbar(data = enrichmentDataFinal %>% filter(Relation == "Sa->Pa"),
+                aes(ymin = meanEnrichment-sdEnrichment,ymax = meanEnrichment+sdEnrichment, x = Strain),size=.2, width = .1)+
+  labs( y = bquote(paste("Distance ("*mu*"m)")), x = "" ) +
+  scale_shape_manual(values = c(1,2),name = "", limits=c("wt","mut"),labels = c(bquote(paste(italic('P. aeruginosa'), " wild-type")),
+                                bquote(paste(italic('P. aeruginosa '), Delta*"pqsL"))))+
+  scale_x_discrete(name ="", breaks = c("wt","mut"), labels =c("wild-type",expression(""*Delta*"pqsL")))+
+  ylim(1, 9)+
+  theme_cowplot()
+
+sa.saPlot<-ggplot()+
+  geom_point(data = enrichmentDataFinal %>% filter(Relation == "Sa->Sa"),aes(y=meanEnrichment, x = Strain, shape = Strain),size=4)+
+  geom_errorbar(data = enrichmentDataFinal %>% filter(Relation == "Sa->Sa"),
+                aes(ymin = meanEnrichment-sdEnrichment,ymax = meanEnrichment+sdEnrichment, x = Strain),size=.2, width = .1)+
+  labs( y = bquote(paste("Distance ("*mu*"m)")), x = "" ) +
+  scale_shape_manual(values = c(1,2),name = "", limits=c("wt","mut"),labels = c(bquote(paste(italic('P. aeruginosa'), " wild-type")),
+                                bquote(paste(italic('P. aeruginosa '), Delta*"pqsL"))))+
+  scale_x_discrete(name ="", breaks = c("wt","mut"), labels =c("wild-type",expression(""*Delta*"pqsL")))+
+  ylim(1, 9)+
+  theme_cowplot()
+
+legendFigure3 <- get_legend(sa.saPlot + theme(legend.box.margin = margin(0, 0, 0, -10)))
+figure3 <- plot_grid(sa.saPlot+theme(legend.position="none"),sa.paPlot+theme(legend.position="none"),
+                      align='vh',labels = c("A", "B"),hjust = -1,nrow = 1)
+plot_grid(figure3,legendFigure3,rel_widths = c(4, 1.7))
+#plot_grid(sa.saPlot,sa.paPlot,align='vh',labels = c("A", "B"),hjust = -1,nrow = 1)
+
+#p-value calculations
+pvalueEnrichmentGR<- allDeathCurvesLog2midAbsEnrichment2 %>% filter(Source == "finalGR") %>% filter(!Distance == 6.5)%>% filter(!Distance == 10.5)
+
+wtpvalueEnrichmentGR<-pvalueEnrichmentGR %>% filter(Strain=="wt")
+mutpvalueEnrichmentGR<-pvalueEnrichmentGR %>% filter(Strain=="mut")
+POTtest<-t.test(x = wtpvalueEnrichmentGR$EnrichmentDistance, y = mutpvalueEnrichmentGR$EnrichmentDistance, paired = T)
+POTtest
+
+pvalueEnrichmentRG<- allDeathCurvesLog2midAbsEnrichment2 %>% filter(Source == "finalRG") %>% filter(!Distance == 7.5)%>% filter(!Distance == 9.5) %>% filter(!Distance == 5.5) %>% filter(!Distance == 3.5) %>% ungroup() %>% slice(2:7)
+wtpvalueEnrichmentRG<-pvalueEnrichmentRG %>% filter(Strain=="wt")
+mutpvalueEnrichmentRG<-pvalueEnrichmentRG %>% filter(Strain=="mut")
+POGRTtest<-t.test(x = wtpvalueEnrichmentRG$EnrichmentDistance, y = mutpvalueEnrichmentRG$EnrichmentDistance, paired = T)
+POGRTtest
+
+```
