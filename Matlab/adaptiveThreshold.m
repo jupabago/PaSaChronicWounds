@@ -21,13 +21,17 @@ end
 
 
 function iterateSamples(sampleName, sampleNum,xy,z)
-rawTifPathBase = '/Users/scapps6/Documents/Whiteley Lab/Imaging Data/pa14_wt_mono_01_01/';
+rawTifPathBase = '/Users/scapps6/Documents/Whiteley Lab/Imaging Data/pa14_wt_mono_01_01';
+%Folder containing stitched/standardized tiff files from Imaris
 %rawTifPathBase = '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks New/';
-binTifPathBase = '/Users/scapps6/Documents/Whiteley Lab/Imaging Data/Binary Images/';
+binTifPathBase = '/Users/scapps6/Documents/Whiteley Lab/Imaging Data/Binary Images';
+%Folder created to contain binary images (white and black) 
 %binTifPathBase = '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/';
-aggsFilePathBase = '/Users/scapps6/Documents/Whiteley Lab/Imaging Data/Aggregate Lists/';
+aggsFilePathBase = '/Users/scapps6/Documents/Whiteley Lab/Imaging Data/Aggregate Lists';
+%Folder created to contain aggregate data
 %aggsFilePathBase = '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists/'; %names are different
 slicedAggsFilePathBase = '/Users/scapps6/Documents/Whiteley Lab/Imaging Data/Results Per Slice/';
+%Aggregate data per slice folder
 %slicedAggsFilePathBase = '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Results per slice/'; %names are different
 rawTifPath = [rawTifPathBase,sampleName,GetNum(sampleNum),'/'];
 binTifPath = [binTifPathBase,sampleName,GetNum(sampleNum),'/'];
@@ -40,7 +44,7 @@ end
 function Tiff2Data (rawTifPath,binTifPath, aggsFilePath,slicedAggsPath, xySize, zSize)
 wienerSize = ceil(5/xySize); %image filter neighborhod set at 5 microns
 tic
-[ch1,ch2,ch3] = Stack2volume(rawTifPath);%split the image by the 3 channels.
+[ch1,ch2] = Stack2volume(rawTifPath);%split the image by the 3 channels.
 toc
 disp('filtering and stretching channel 1')
 filtered1 = imbinarize(FilterImage(ch1, wienerSize));
@@ -50,10 +54,10 @@ disp('filtering and stretching channel 2')
 filtered2 = imbinarize(FilterImage(ch2, wienerSize));
 clear ch2
 toc
-disp('filtering and stretching channel 3')
-filtered3 = imbinarize(FilterImage(ch3, wienerSize));
-clear ch3
-toc
+% disp('filtering and stretching channel 3')
+% filtered3 = imbinarize(FilterImage(ch3, wienerSize));
+% clear ch3
+% toc
 disp('combining and saving')
 
 %now remove bleeding from red into the green channel and isolated pixels and create a clean volume
@@ -86,18 +90,19 @@ end
 clear volume %empty original volume from memory
 end
 
-function [ch1Volume, ch2Volume, ch3Volume] = Stack2volume(directory)%takes a folder with tiffs and returns a 3d-volume/matrix
+function [ch1Volume, ch2Volume] = Stack2volume(directory)
+%takes a folder with tiffs and returns a 3d-volume/matrix
 imageFolder=dir([directory '/*.tif']);%the star is for removing the two files that aren't tiffs
 %slices = 10; %this is in case I need to just test this step
 slices = size(imageFolder,1);
 [width, height,~] = size(imread(strcat(directory,'/',imageFolder(1).name)));%third dimension here is 3, one per channel
-[ch1Volume, ch2Volume, ch3Volume]= deal(zeros(width, height, slices)); %initialize matrix with zeros
+[ch1Volume, ch2Volume]= deal(zeros(width, height, slices)); %initialize matrix with zeros
 for slice= 1:slices
     imageInt = imread(strcat(directory,'/',imageFolder(slice).name));%read image. Intensity is not 0-1 yet
     image = im2double(imageInt);%convert to 0-1 intensity values so that filters work and thresholding work as expected
     ch1Volume(:,:,slice) = squeeze(image(:,:,1)); %separate channels. remember channels don't necessarily match colors in order
     ch2Volume(:,:,slice) = squeeze(image(:,:,2)); 
-    ch3Volume(:,:,slice) = squeeze(image(:,:,3));
+    %ch3Volume(:,:,slice) = squeeze(image(:,:,3));
 end
 end
 
