@@ -15,6 +15,7 @@ library(dplyr)
 library(cowplot)
 filter <- dplyr::filter
 library(EBImage) #for rtiff
+
 ```
 
 ```{r aggregate input}
@@ -75,11 +76,13 @@ aggregateList<-aggregateList %>% filter(!SampleCode == "phz_d4_06")
 #add proper labels for plots
 aggregateList$Species <- factor(aggregateList$Species, levels = c("Pa", "Sa"),labels = c('P. aeruginosa','S. aureus'))
 aggregateList$Condition <- factor(aggregateList$Condition, levels = c("mono", "pawt","papqsL", "paphz", "wt", "pqsL", "phz"),
-                                  labels = c('Sa mono', 'Pa wt mono','pqsL mono','phz mono','wt co', 'pqsL co', 'phz co'))
+                                  labels = c('Sa mono', 'wt mono','pqsL mono','phz mono','wt co', 'pqsL co', 'phz co'))
 aggregateList$TimePoint <- factor(aggregateList$TimePoint, levels = c("d1", "d4"),labels = c('Day 1','Day 4'))
 
-aggregateList<-aggregateList %>% mutate(Culture = recode(Condition, 'Sa mono' = "mono", 'Pa wt mono' = "mono",'pqsL mono'= "mono",'phz mono'= "mono",'wt co'= "co", 'pqsL co'= "co", 'phz co'= "co"))
-aggregateList<-aggregateList%>% mutate(Strain = recode(Condition, 'Sa mono' = "Sa", 'Pa wt mono' = "wt",'pqsL mono'= "pqsL",'phz mono'= "phz",'wt co'= "wt", 'pqsL co'= "pqsL", 'phz co'= "phz"))
+aggregateList<-aggregateList %>% mutate(Culture = recode(Condition, 'Sa mono' = "mono", 'wt mono' = "mono",'pqsL mono'= "mono",'phz mono'= "mono",'wt co'= "co", 'pqsL co'= "co", 'phz co'= "co"))
+aggregateList<-aggregateList%>% mutate(Strain = recode(Condition, 'Sa mono' = "Sa", 'wt mono' = "wt",'pqsL mono'= "pqsL",'phz mono'= "phz",'wt co'= "wt", 'pqsL co'= "pqsL", 'phz co'= "phz"))
+aggregateList<-aggregateList%>% mutate(SaStrain = recode(Condition, 'Sa mono' = "Sa mono", 'wt mono' = "wt",'pqsL mono'= "pqsL",'phz mono'= "phz",'wt co'= "co-wt", 'pqsL co'= "co-pqsL", 'phz co'= "co-phz"))
+
 #Adding the metadata
 metaData <-read.csv('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/images metadata.csv', header = TRUE)
 metaData<-metaData %>% select(SampleCode, mouse, Position, size, Region, Zdim, xyDim,xySize)
@@ -92,9 +95,17 @@ aggregateList$Region<-as.factor(aggregateList$Region)
 ```{r aggregate wrangling and overview plots}
 #Statistics from all aggregates
 #Get aggregate summary per sample
-aggregateListSummaryReplicate<-aggregateList%>% group_by(SampleCode, Species, Strain, Culture,TimePoint, Condition, Replicate,Region) %>% 
+aggregateListSummaryReplicate<-aggregateList%>% group_by(SampleCode, Species,SaStrain, Strain, Culture,TimePoint, Condition, Replicate,Region) %>% 
   summarise(Aggs = n(), biomass = sum(Size), meanAggSize = mean(Size), seAggSize = std.error(Size), maxSize = max(Size), minSize = min(Size)) %>%
   ungroup() %>% mutate(RatioMaxTotal = maxSize/biomass) 
+
+#Get aggregate Summary per condition
+aggregateListSummaryCondNoRegion<-aggregateListSummaryReplicate %>% group_by(Species,SaStrain, Strain, Culture,TimePoint, Condition) %>% 
+  summarise(meanAggs= mean(Aggs), meanBiomassLog = mean(log10(biomass)), SEBiomassLog = std.error((log10(biomass))), meanAggSize = mean(meanAggSize), seAggSize = std.error(meanAggSize))%>%  mutate(meanBiomass =  meanBiomassLog^10, SEBiomass = SEBiomassLog^10) 
+
+#Get aggregate Summary per condition and region
+aggregateListSummaryCondition<-aggregateListSummaryReplicate %>% group_by(Species, SaStrain,Strain, Culture,TimePoint, Condition, Region) %>% 
+  summarise(meanAggs= mean(Aggs), meanBiomassLog = mean(log10(biomass)), SEBiomassLog = std.error((log10(biomass))), meanAggSize = mean(meanAggSize), seAggSize = std.error(meanAggSize))%>%  mutate(meanBiomass =  meanBiomassLog^10, SEBiomass = SEBiomassLog^10) 
 
 #Plot agg summary per sample
 #####
@@ -115,6 +126,7 @@ ggplot()+
         strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
 #####
 #Plot only biomass per Sample
+#####
 PlotBiomasPerSample<-function(df){
 ggplot()+ 
     #this is for multiple conditions
@@ -137,14 +149,13 @@ ggplot()+
         strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
 }
 
+#plotting all conditions
 PlotBiomasPerSample(aggregateListSummaryReplicate)
 #plotting only Sa and pa wt in mono and co-culture
 PlotBiomasPerSample(aggregateListSummaryReplicate %>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "Pa wt mono"))
+#####
 
-#Get aggregate Summary per condition
-aggregateListSummaryCondition<-aggregateListSummaryReplicate %>% group_by(Species, Strain, Culture,TimePoint, Condition, Region) %>% 
-  summarise(meanAggs= mean(Aggs), meanBiomassLog = mean(log10(biomass)), SEBiomassLog = std.error((log10(biomass))), meanAggSize = mean(meanAggSize), seAggSize = std.error(meanAggSize))%>%  mutate(meanBiomass =  meanBiomassLog^10, SEBiomass = SEBiomassLog^10) 
-#plot agg summary per condition
+#plot agg summary per condition#this shows both contition and replicate
 #####
 PlotBiomassPerCondition<-function(df, metric, error){
 ggplot()+ 
@@ -161,19 +172,48 @@ ggplot()+
   theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facets
           strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))
 }
+
 PlotBiomassPerCondition(aggregateListSummaryCondition,"meanBiomass", "SEBiomass")
-PlotBiomassPerCondition(aggregateListSummary,"biomass")
 #####
-#combining all 
-PlotBiomasPerSampleAndConditionWT<-function(df1,df2){
+
+
+#Plotting mean and all samples
+PlotBiomasPerSampleAndConditionWT<-function(df1,df2, df3){
 ggplot()+ 
-    geom_point(data = df1, aes(x = Culture, y= meanBiomassLog,color = Species,shape = Region), 
+    geom_point(data = df1 %>% filter(TimePoint=="Day 4"), aes(x = Culture, y= meanBiomassLog,shape = Region), 
              position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75), size = 4)+
-  geom_point(data = df2, aes(x = Culture, y= log10(biomass), color= Species, shape = Region),size = 1, 
+  geom_point(data = df2%>% filter(TimePoint=="Day 4"), aes(x = Culture, y= log10(biomass), shape = Region),size = 1, 
              position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75))+
+    geom_point(data = df3 %>% filter(TimePoint=="Day 4"), aes(x = Culture, y= meanBiomassLog),shape = 3,size = 4)+
     #scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)), limits = c(1, 100000000))+
-      facet_grid(.~TimePoint, scales = "free", space = "free") +
+      facet_grid(.~Species, scales = "free", space = "free") +
   ggtitle('Biomass per sample')+
+  labs(x = "",y = bquote(paste("log10 Volume (", mu*"m"^3*")")))+
+  scale_color_brewer(palette = "Set1")+
+  scale_shape_manual(values=c(16, 1))+
+  ylim(0,8)+
+    theme_cowplot()+
+  panel_border() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
+        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
+}
+
+#WT only
+PlotBiomasPerSampleAndConditionWT(aggregateListSummaryCondition%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "Pa wt mono"),
+                                aggregateListSummaryReplicate %>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "Pa wt mono"), 
+                                aggregateListSummaryCondNoRegion%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "Pa wt mono"))
+
+PlotBiomasPerSampleAndCondition<-function(df1,df2, df3, species){
+ggplot()+ 
+    geom_point(data = df1 %>% filter(TimePoint=="Day 4") %>% filter(Species==species), aes(x = SaStrain, y= meanBiomassLog,shape = Region), 
+             position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75), size = 4)+
+  geom_point(data = df2%>% filter(TimePoint=="Day 4") %>% filter(Species==species), aes(x = SaStrain, y= log10(biomass), shape = Region),size = 1, 
+             position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75))+ 
+  geom_point(data = df3 %>% filter(TimePoint=="Day 4") %>% filter(Species==species), aes(x = SaStrain, y= meanBiomassLog), shape = 3, size = 4)+
+    #scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)), limits = c(1, 100000000))+
+      facet_grid(.~Species, scales = "free", space = "free") +
+  ggtitle('Total Biomass')+
   labs(x = "",y = bquote(paste("Volume (log10", mu*"m"^3*")")))+
   scale_color_brewer(palette = "Set1")+
   scale_shape_manual(values=c(16, 1))+
@@ -184,29 +224,109 @@ ggplot()+
         strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
         strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
 }
-PlotBiomasPerSampleAndConditionWT(aggregateListSummaryCondition%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "Pa wt mono"),
-                                aggregateListSummaryReplicate %>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "Pa wt mono"))
-PlotBiomasPerSampleAndCondition<-function(df1,df2){
+PlotBiomasPerSampleAndCondition(aggregateListSummaryCondition,
+                                aggregateListSummaryReplicate,
+                                aggregateListSummaryCondNoRegion, "S. aureus")
+
+PlotMeanAggsPerSampleAndConditionWT<-function(df1,df2, df3){
 ggplot()+ 
-    geom_point(data = df1, aes(x = Culture, y= meanBiomassLog,color = Strain,shape = Region), 
+    geom_point(data = df1 %>% filter(TimePoint=="Day 4"), aes(x = Culture, y= meanAggs,shape = Region), 
              position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75), size = 4)+
-  geom_point(data = df2, aes(x = Culture, y= log10(biomass), color= Strain, shape = Region),size = 1, 
+  geom_point(data = df2%>% filter(TimePoint=="Day 4"), aes(x = Culture, y= Aggs, shape = Region),size = 1, 
              position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75))+
-    #scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)), limits = c(1, 100000000))+
-      facet_grid(Species~TimePoint, scales = "free", space = "free") +
-  ggtitle('Biomass per sample')+
-  labs(x = "",y = bquote(paste("Volume (log10", mu*"m"^3*")")))+
+    geom_point(data = df3 %>% filter(TimePoint=="Day 4"), aes(x = Culture, y= meanAggs),shape = 3,size = 4)+
+    scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)), limits = c(10, 100000))+
+      facet_grid(.~Species, scales = "free", space = "free") +
+  ggtitle('Number of groups of bacteria')+
+  labs(x = "",y = "")+
   scale_color_brewer(palette = "Set1")+
-  scale_shape_manual(values=c(4,16, 1))+
-  ylim(0,8)+
+  scale_shape_manual(values=c(16, 1))+
+  #ylim(0,8)+
     theme_cowplot()+
   panel_border() +
   theme(plot.title = element_text(hjust = 0.5), 
         strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
         strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
 }
-PlotBiomasPerSampleAndCondition(aggregateListSummaryCondition,aggregateListSummaryReplicate)
+PlotMeanAggsPerSampleAndConditionWT(aggregateListSummaryCondition%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "Pa wt mono"),
+                                aggregateListSummaryReplicate %>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "Pa wt mono"), 
+                                aggregateListSummaryCondNoRegion%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "Pa wt mono"))
 
+PlotMeanAggsPerSampleAndCondition<-function(df1,df2, df3,species){
+ggplot()+ 
+    geom_point(data = df1 %>% filter(TimePoint=="Day 4") %>% filter(Species == species), aes(x = SaStrain, y= meanAggs,shape = Region), 
+             position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75), size = 4)+
+  geom_point(data = df2%>% filter(TimePoint=="Day 4")%>% filter(Species == species), aes(x = SaStrain, y= Aggs, shape = Region),size = 1, 
+             position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75))+
+    geom_point(data = df3 %>% filter(TimePoint=="Day 4")%>% filter(Species == species), aes(x = SaStrain, y= meanAggs),shape = 3,size = 4)+
+    scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)), limits = c(10, 100000))+
+      #facet_grid(, scales = "free", space = "free") +
+  ggtitle('Number of groups of bacteria')+
+  labs(x = "",y = "")+
+  scale_color_brewer(palette = "Set1")+
+  scale_shape_manual(values=c(16, 1))+
+  #ylim(0,8)+
+    theme_cowplot()+
+  panel_border() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
+        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
+}
+PlotMeanAggsPerSampleAndCondition(aggregateListSummaryCondition,
+                                aggregateListSummaryReplicate, 
+                                aggregateListSummaryCondNoRegion, "S. aureus")
+
+PlotMeanAggsPerSampleAndConditionPa<-function(df1,df2, df3,species){
+ggplot()+ 
+    geom_point(data = df1 %>% filter(TimePoint=="Day 4") %>% filter(Species == species), aes(x = Strain, y= meanAggs,shape = Region, color= Region), 
+             position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75),
+             fill = "black", size = 4)+
+  geom_point(data = df2%>% filter(TimePoint=="Day 4")%>% filter(Species == species), aes(x = Strain, y= Aggs, shape = Region, color = Region),size = 1, fill = "black", 
+             position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75))+
+    geom_point(data = df3 %>% filter(TimePoint=="Day 4")%>% filter(Species == species), aes(x = Strain, y= meanAggs),shape = 3,size = 4)+
+    scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)), limits = c(10, 100000))+
+      facet_grid(.~Culture, scales = "free", space = "free") +
+  ggtitle('Number of groups of bacteria')+
+  labs(x = "",y = "")+
+  #scale_color_brewer(palette = "Set1")+
+  scale_color_manual(values = c("white", "black"))+
+  scale_shape_manual(values=c(21, 1))+
+  #ylim(0,8)+
+    theme_cowplot()+
+  panel_border() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
+        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
+}
+
+```
+```{r figures 1A,1B and 2A, 2B}
+#Biomass wt
+PlotBiomasPerSampleAndConditionWT(aggregateListSummaryCondition%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "Pa wt mono"),
+                                aggregateListSummaryReplicate %>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "Pa wt mono"), 
+                                aggregateListSummaryCondNoRegion%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "Pa wt mono"))
+#Biomass Sa and mutants
+PlotBiomasPerSampleAndCondition(aggregateListSummaryCondition,
+                                aggregateListSummaryReplicate,
+                                aggregateListSummaryCondNoRegion, "S. aureus")
+
+PlotBiomasPerSampleAndCondition(aggregateListSummaryCondition,
+                                aggregateListSummaryReplicate,
+                                aggregateListSummaryCondNoRegion, "P. aeruginosa")
+
+#Number of aggregates wt
+PlotMeanAggsPerSampleAndConditionWT(aggregateListSummaryCondition%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "Pa wt mono"),
+                                aggregateListSummaryReplicate %>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "Pa wt mono"), 
+                                aggregateListSummaryCondNoRegion%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "Pa wt mono"))
+
+#Number of aggregates Sa and mutants
+PlotMeanAggsPerSampleAndCondition(aggregateListSummaryCondition,
+                                aggregateListSummaryReplicate, 
+                                aggregateListSummaryCondNoRegion, "S. aureus")
+
+PlotMeanAggsPerSampleAndConditionPa(aggregateListSummaryCondition,
+                                aggregateListSummaryReplicate, 
+                                aggregateListSummaryCondNoRegion, "P. aeruginosa")
 ```
 
 ```{r Aggregate size bins}
@@ -218,51 +338,89 @@ PlotBiomasPerSampleAndCondition(aggregateListSummaryCondition,aggregateListSumma
 
 #There are two ways to normalize the Bin Frequncy and Bin Biomass, per condition and per sample, so I'll do both
 #First per replicate:
-HistReplicate<-aggregateList %>% mutate(LogBin = case_when(Size <= 5 ~ 5,
-                        Size<= 10 ~ 10,
-                        Size<= 100    ~ 100,
-                        Size<= 1000   ~ 1000,
-                        Size<= 10000  ~ 10000,
-                        Size<= 100000 ~ 100000,
-                        Size > 100000 ~ 1000000)) %>% group_by(Species,Culture,Strain, Condition,TimePoint, Replicate)%>% 
+#####
+HistReplicate<-aggregateList %>% mutate(LogBin = case_when(Size <= 5 ~ "(.5, 5]",
+                        Size<= 10 ~ "(5, 10]",
+                        Size<= 100    ~ "(10, 100]",
+                        Size<= 1000   ~ "(100, 1000]",
+                        Size> 1000  ~ paste0("(1000, ",bquote("\U221E"), ")"))) %>% 
+  group_by(SampleCode)%>% 
   mutate(TotalBiomass = sum(Size), TotalFrequency = n()) %>% ungroup() %>% 
-  group_by(Species,Culture,Strain, Condition,TimePoint, Replicate, LogBin)%>%
+  group_by(SampleCode, LogBin)%>%
   mutate(BinBiomass = sum(Size), BinFrequency = n()) %>% ungroup() %>%
   mutate(NormalizedFrequency = BinFrequency/TotalFrequency*100, NormalizedBiomass = BinBiomass/TotalBiomass*100)
+
+HistReplicate$LogBin <- factor(HistReplicate$LogBin, levels = c("(.5, 5]", "(5, 10]","(10, 100]", "(100, 1000]", paste0("(1000, ",bquote("\U221E"), ")")),labels = c(levels = c("(.5, 5]", "(5, 10]","(10, 100]", "(100, 1000]", paste0("(1000, ",bquote("\U221E"), ")"))))
+
 
 #This is weird, but I want to have the histogram above with all the data, and the one below with only the bins
 HistReplicateSummary<-HistReplicate %>% 
-  group_by(Species,Culture,Strain, Condition,TimePoint, Replicate, LogBin,NormalizedFrequency,NormalizedBiomass) %>% summarize() %>%
-  unique()%>%ungroup() %>%  group_by(Species,Culture,Condition,TimePoint, Replicate) %>% 
+  group_by(Species,Culture,SaStrain, Strain,Region,Condition,TimePoint, Replicate,SampleCode, LogBin,NormalizedFrequency,NormalizedBiomass) %>% summarize() %>%
+  unique()%>%ungroup() %>%  group_by(Species,Strain, SaStrain,Culture,Condition,TimePoint, Replicate, SampleCode) %>% 
   mutate(checkSumFreq =sum(NormalizedFrequency), checkSumBiomass = sum(NormalizedBiomass))
-
+#####
 #Now per condition. The difference is int the "group_by" part
-HistCondition<-aggregateList %>% mutate(LogBin = case_when(Size <= 5 ~ 5,
-                        Size<= 10 ~ 10,
-                        Size<= 100    ~ 100,
-                        Size<= 1000   ~ 1000,
-                        Size<= 10000  ~ 10000,
-                        Size<= 100000 ~ 100000,
-                        Size > 100000 ~ 1000000)) %>% group_by(Species,Culture,Strain, Condition,TimePoint)%>% 
+#####
+HistCondition<-aggregateList %>% mutate(LogBin = case_when(Size <= 5 ~ "(.5, 5]",
+                        Size<= 10 ~ "(5, 10]",
+                        Size<= 100    ~ "(10, 100]",
+                        Size<= 1000   ~ "(100, 1000]",
+                        Size> 1000  ~ paste0("(1000, ",bquote("\U221E"), ")"))) %>% 
+  group_by(Species,Condition,TimePoint)%>% 
   mutate(TotalBiomass = sum(Size), TotalFrequency = n()) %>% ungroup() %>%
-  group_by(Species,Culture,Strain, Condition,TimePoint,LogBin)%>%
+  group_by(Species, Condition,TimePoint,LogBin)%>%
   mutate(BinBiomass = sum(Size), BinFrequency = n()) %>% ungroup() %>%
   mutate(NormalizedFrequency = BinFrequency/TotalFrequency*100, NormalizedBiomass = BinBiomass/TotalBiomass*100)
+HistCondition$LogBin <- factor(HistCondition$LogBin, levels = c("(.5, 5]", "(5, 10]","(10, 100]", "(100, 1000]", paste0("(1000, ",bquote("\U221E"), ")")),labels = c(levels = c("(.5, 5]", "(5, 10]","(10, 100]", "(100, 1000]", paste0("(1000, ",bquote("\U221E"), ")"))))
 
 #Summary data frame
 HistConditionSummary<-HistCondition %>%
-  group_by(Species,Culture,Strain, Condition,TimePoint,LogBin,NormalizedFrequency,NormalizedBiomass) %>% summarize() %>% 
-  unique()%>%ungroup() %>%  group_by(Species,Culture,Condition,TimePoint) %>% 
+  group_by(Species,Culture,SaStrain, Strain, Condition,TimePoint,LogBin,NormalizedFrequency,NormalizedBiomass) %>% 
+  summarize() %>% unique()%>%ungroup() %>%
+  group_by(Species,Culture,Strain,SaStrain, Condition,TimePoint) %>% 
   mutate(checkSumFreq =sum(NormalizedFrequency), checkSumBiomass = sum(NormalizedBiomass))
+#####
+
+#Now per condition including region. The difference is int the "group_by" part
+#####
+HistConditionRegin<-aggregateList %>% mutate(LogBin = case_when(Size <= 5 ~ "(.5, 5]",
+                        Size<= 10 ~ "(5, 10]",
+                        Size<= 100    ~ "(10, 100]",
+                        Size<= 1000   ~ "(100, 1000]",
+                        Size> 1000  ~ paste0("(1000, ",bquote("\U221E"), ")"))) %>% 
+  group_by(Species,Condition,TimePoint, Region)%>% 
+  mutate(TotalBiomass = sum(Size), TotalFrequency = n()) %>% ungroup() %>%
+  group_by(Species, Condition,TimePoint, Region,LogBin)%>%
+  mutate(BinBiomass = sum(Size), BinFrequency = n()) %>% ungroup() %>%
+  mutate(NormalizedFrequency = BinFrequency/TotalFrequency*100, NormalizedBiomass = BinBiomass/TotalBiomass*100)
+
+
+HistConditionRegin$LogBin <- factor(HistConditionRegin$LogBin, levels = c("(.5, 5]", "(5, 10]","(10, 100]", "(100, 1000]", paste0("(1000, ",bquote("\U221E"), ")")),labels = c(levels = c("(.5, 5]", "(5, 10]","(10, 100]", "(100, 1000]", paste0("(1000, ",bquote("\U221E"), ")"))))
+
+
+#Summary data frame
+HistCondRegionSum<-HistConditionRegin %>%
+  group_by(Species,Culture,SaStrain, Strain, Condition,TimePoint, Region,LogBin,NormalizedFrequency,NormalizedBiomass) %>% 
+  summarize() %>% unique()%>%ungroup() %>%
+  group_by(Species,Culture,Strain,SaStrain, Condition,TimePoint, Region) %>% 
+  mutate(checkSumFreq =sum(NormalizedFrequency), checkSumBiomass = sum(NormalizedBiomass))
+#####
 
 #Plot Normalized Frequency
 #this isn't useful as the normalized Frequency changes with replicate, so it's better to pool all samples together
-PlotHistSum<-function(rep.df,cond.df, y_var, title){
+PlotHistSum<-function(rep.df,cond.df,region.df, y_var, title, species, colorStrain){
 ggplot()+
-    geom_jitter(data = rep.df,aes(x=as.factor(LogBin),y=.data[[y_var]],  color =Condition),size=3, height = 0, width = .2, shape = 1)+
-    geom_point(data = cond.df,aes(x=as.factor(LogBin),y=.data[[y_var]],  color =Condition,group = Condition),size=4, shape = 16, position = position_dodge(width = .5) )+
-    scale_y_log10(breaks = c(100, 10, 1, .1, .01), labels = c(100, 10, 1, .1, .01))+
-    facet_grid(Species~TimePoint)+
+    geom_point(data = rep.df %>% filter(TimePoint=="Day 4")%>% filter(Species == species),
+                aes(x=as.factor(LogBin),y=.data[[y_var]], color =.data[[colorStrain]], shape = Region),
+               position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75),size=1)+
+    geom_point(data = region.df%>% filter(TimePoint=="Day 4")%>% filter(Species == species),
+               aes(x=as.factor(LogBin),y=.data[[y_var]], color =.data[[colorStrain]],shape = Region),
+               size=3, position = position_dodge(width = .75) )+
+    geom_point(data = cond.df%>% filter(TimePoint=="Day 4") %>% filter(Species == species),
+               aes(x=as.factor(LogBin),y=.data[[y_var]],  color =.data[[colorStrain]]),size=4, shape = 3,position = position_dodge(width = .75) )+
+    #scale_y_log10(breaks = c(100, 10, 1, .1, .01), labels = c(100, 10, 1, .1, .01))+
+    facet_grid(.~Species)+
+    scale_shape_manual(values=c(16, 1))+
     ggtitle(title)+
     labs(y = paste(y_var,"(%)"),x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
     scale_color_brewer(palette = "Set1")+
@@ -272,10 +430,25 @@ ggplot()+
         strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
         strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
 }
+PlotHistSum(HistReplicateSummary,HistConditionSummary,HistCondRegionSum,"NormalizedFrequency", "Normalized Frequency all sizes", "S. aureus")
 
-PlotHistSum(HistReplicateSummary,HistConditionSummary,"NormalizedFrequency", "Normalized Frequency all sizes")
+####---Figure 1C
+PlotHistSum(HistReplicateSummary %>% filter(SaStrain %in% c("Sa mono", "co-wt")),
+            HistConditionSummary%>% filter(SaStrain %in% c("Sa mono", "co-wt")),
+            HistCondRegionSum%>% filter(SaStrain %in% c("Sa mono", "co-wt")),
+            "NormalizedFrequency", "Normalized Frequency all sizes", "S. aureus", "Culture")
 
-PlotHistSum(HistReplicateSummary,HistConditionSummary,"NormalizedBiomass", "Normalized Biomass all sizes")
+PlotHistSum(HistReplicateSummary %>% filter(Strain %in% c("wt")),
+            HistConditionSummary%>% filter(Strain %in% c("wt")),
+            HistCondRegionSum%>% filter(Strain %in% c("wt")),
+            "NormalizedFrequency", "Normalized Frequency all sizes", "P. aeruginosa", "Culture")
+
+PlotHistSum(HistReplicateSummary,
+            HistConditionSummary,
+            HistCondRegionSum,
+            "NormalizedFrequency", "Normalized Frequency all sizes", "S. aureus", "SaStrain")
+
+PlotHistSum(HistReplicateSummary,HistCondRegionSum,HistConditionSummary,"NormalizedBiomass", "Normalized Biomass all sizes")
 
 #Plot normalized Biomass per sample
 ##Pa
@@ -294,37 +467,47 @@ PlotHistRepBioTrend(HistReplicateSummary, "P. aeruginosa")
 PlotHistRepBioTrend(HistReplicateSummary, "S. aureus")
 
 #####
-#now only aggregates 5 microns or larger
+#Now only aggregates 5 microns or larger
+
+##Separating the replicates
 #####
-#Separating the replicates
 aggsHistRep<-aggregateList %>% mutate(LogBin = case_when(Size <= 5 ~ 5,
                         Size<= 10 ~ 10,
                         Size<= 100    ~ 100,
                         Size<= 1000   ~ 1000,
                         Size<= 10000  ~ 10000,
                         Size<= 100000 ~ 100000,
-                        Size > 100000 ~ 1000000)) %>% filter(!LogBin == 5) %>% group_by(Species,Culture,Strain,Condition,TimePoint, Replicate)%>% 
-  mutate(TotalBiomass = sum(Size), TotalFrequency = n()) %>% ungroup() %>% group_by(Species,Culture,Strain,Condition,TimePoint, Replicate, LogBin)%>%
+                        Size > 100000 ~ 1000000)) %>% filter(!LogBin == 5) %>%
+  group_by(Species,Culture,Strain,Condition,TimePoint, Replicate)%>% 
+  mutate(TotalBiomass = sum(Size), TotalFrequency = n()) %>% ungroup() %>% 
+  group_by(Species,Culture,Strain,Condition,TimePoint, Replicate, LogBin)%>%
   mutate(BinBiomass = sum(Size), BinFrequency = n()) %>% ungroup() %>%
   mutate(NormalizedFrequency = BinFrequency/TotalFrequency*100, NormalizedBiomass = BinBiomass/TotalBiomass*100)
 
 ##Summary df
 aggsHistRepSum<-aggsHistRep %>% group_by(Species,Culture,Strain,Condition,TimePoint, Replicate, LogBin,NormalizedFrequency,NormalizedBiomass) %>% summarize() %>%  unique()%>%ungroup() %>%  group_by(Species,Culture,Strain,Condition,TimePoint, Replicate) %>% mutate(checkSumFreq =sum(NormalizedFrequency), checkSumBiomass = sum(NormalizedBiomass))
-
-#Pooling replicates together
+#####
+##Pooling replicates together
+#####
 aggsHistCond<-aggregateList %>% mutate(LogBin = case_when(Size <= 5 ~ 5,
                         Size<= 10 ~ 10,
                         Size<= 100    ~ 100,
                         Size<= 1000   ~ 1000,
                         Size<= 10000  ~ 10000,
                         Size<= 100000 ~ 100000,
-                        Size > 100000 ~ 1000000)) %>% filter(!LogBin == 5) %>% group_by(Species,Culture,Strain,Condition,TimePoint)%>% 
-  mutate(TotalBiomass=sum(Size),TotalFrequency=n()) %>% ungroup() %>% group_by(Species,Culture,Strain,Condition,TimePoint, LogBin)%>%
+                        Size > 100000 ~ 1000000)) %>% filter(!LogBin == 5) %>%
+  group_by(Species,Culture,Strain,Condition,TimePoint)%>% 
+  mutate(TotalBiomass=sum(Size),TotalFrequency=n()) %>% ungroup() %>% 
+  group_by(Species,Culture,Strain,Condition,TimePoint, LogBin)%>%
   mutate(BinBiomass = sum(Size), BinFrequency = n()) %>% ungroup() %>%
   mutate(NormalizedFrequency = BinFrequency/TotalFrequency*100, NormalizedBiomass = BinBiomass/TotalBiomass*100)
 
 ##Summary df
-aggsHistCondSum<-aggsHistCond %>% group_by(Species,Culture,Strain,Condition,TimePoint, Replicate, LogBin,NormalizedFrequency,NormalizedBiomass) %>% summarize() %>%  unique()%>%ungroup() %>%  group_by(Species,Culture,Strain,Condition,TimePoint, Replicate) %>% mutate(checkSumFreq =sum(NormalizedFrequency), checkSumBiomass = sum(NormalizedBiomass))%>%ungroup()
+aggsHistCondSum<-aggsHistCond %>% 
+  group_by(Species,Culture,Strain,Condition,TimePoint, LogBin,NormalizedFrequency,NormalizedBiomass) %>%
+  summarize() %>%  unique()%>%ungroup() %>%
+  group_by(Species,Culture,Strain,Condition,TimePoint) %>%
+  mutate(checkSumFreq =sum(NormalizedFrequency), checkSumBiomass = sum(NormalizedBiomass))%>%ungroup()
 
 #now plot it
 #normalized frequency
@@ -335,26 +518,79 @@ PlotHistRepBioTrend(aggsHistRepSum, "P. aeruginosa")
 PlotHistRepBioTrend(aggsHistRepSum, "S. aureus")
 
 #####
+
 #Planktonic vs aggregates
 #####
 #Add agregation value to the dataframe 
 ##Normalize using replicates
-HistReplicate<-HistReplicate %>%  mutate(Aggregation = case_when(LogBin == 5 ~"Planktonic",LogBin>5 ~ "Aggregate")) %>%
-  group_by(Species,Culture,Condition,Strain,TimePoint, Replicate, Aggregation)%>% 
+HistReplicate<-HistReplicate %>%  mutate(Aggregation = if_else(LogBin == "(.5, 5]" ,"Planktonic", "Aggregate")) %>%
+  group_by(Species,SampleCode, Aggregation)%>% 
   mutate(AgPlBiomass = sum(Size), AgPlFreq = n()) %>% ungroup() %>%
   mutate(AgPlNormFrequency = AgPlFreq/TotalFrequency*100, AgPlNormBiomass = AgPlBiomass/TotalBiomass*100)
 #Collapse to only values per replicate
-plankAggHistRep<-HistReplicate %>% group_by(Species,Culture,Condition,Strain,TimePoint, Replicate, Aggregation,AgPlNormFrequency,AgPlNormBiomass) %>% summarize() %>%  unique()%>%ungroup() %>%  group_by(Species,Culture,Strain,Condition,TimePoint, Replicate) %>% mutate(checkAggFreq =sum(AgPlNormFrequency), checkAggBiomass = sum(AgPlNormBiomass))
+plankAggHistRep<-HistReplicate %>% 
+  group_by(Species,Culture,Condition,Strain,TimePoint, Replicate, SaStrain, Region, Aggregation,AgPlNormFrequency,AgPlNormBiomass) %>% 
+  summarize() %>%  unique()%>%ungroup() %>%  
+  group_by(Species,Culture,Condition,Strain,TimePoint, Replicate, SaStrain, Region) %>% mutate(checkAggFreq =sum(AgPlNormFrequency), checkAggBiomass = sum(AgPlNormBiomass))
 
-##Normalize using Condition
-HistCondition<-HistCondition %>%  mutate(Aggregation = case_when(LogBin == 5 ~"Planktonic",LogBin>5 ~ "Aggregate")) %>%
-  group_by(Species,Culture,Condition,Strain, TimePoint, Aggregation)%>% 
+##Normalize using Condition and region
+HistConditionRegin<-HistConditionRegin %>%  mutate(Aggregation = if_else(LogBin == "(.5, 5]", "Planktonic", "Aggregate")) %>%
+  group_by(Species,Culture,Condition,Strain, TimePoint,Region, SaStrain, Aggregation)%>% 
   mutate(AgPlBiomass = sum(Size), AgPlFreq = n()) %>% ungroup() %>%
   mutate(AgPlNormFrequency = AgPlFreq/TotalFrequency*100, AgPlNormBiomass = AgPlBiomass/TotalBiomass*100)
 #Collapse to only values per replicate
-plankAggHistCond<-HistCondition %>% group_by(Species,Culture,Condition,Strain,TimePoint, Aggregation,AgPlNormFrequency,AgPlNormBiomass) %>% summarize() %>%  unique()%>%ungroup() %>%  group_by(Species,Culture,Strain, Condition,TimePoint) %>% mutate(checkAggFreq =sum(AgPlNormFrequency), checkAggBiomass = sum(AgPlNormBiomass))
+plankAggHistCondReg<-HistConditionRegin %>% 
+  group_by(Species,Culture,Condition,SaStrain, Region,Strain,TimePoint, Aggregation,AgPlNormFrequency,AgPlNormBiomass) %>%
+  summarize() %>%  unique()%>%ungroup() %>%
+  group_by(Species,Culture,Condition,SaStrain, Region,Strain,TimePoint) %>% mutate(checkAggFreq =sum(AgPlNormFrequency), checkAggBiomass = sum(AgPlNormBiomass))
+
+##Normalize using Condition 
+HistCondition<-HistCondition %>%  mutate(Aggregation = if_else(LogBin == "(.5, 5]", "Planktonic", "Aggregate")) %>%
+  group_by(Species,Culture,Condition,SaStrain, TimePoint,Strain, Aggregation)%>% 
+  mutate(AgPlBiomass = sum(Size), AgPlFreq = n()) %>% ungroup() %>%
+  mutate(AgPlNormFrequency = AgPlFreq/TotalFrequency*100, AgPlNormBiomass = AgPlBiomass/TotalBiomass*100)
+#Collapse to only values per replicate
+plankAggHistCond<-HistCondition %>% 
+  group_by(Species,Culture,Condition,Strain,SaStrain,TimePoint, Aggregation,AgPlNormFrequency,AgPlNormBiomass) %>%
+  summarize() %>%  unique()%>%ungroup() %>%  
+  group_by(Species,Culture,Condition,Strain,SaStrain,TimePoint) %>% mutate(checkAggFreq =sum(AgPlNormFrequency), checkAggBiomass = sum(AgPlNormBiomass))
+
 
 #Plot Frequency
+PlotAggPlank<-function(rep.df,cond.df,region.df, y_var, title, species, colorStrain){
+ggplot()+
+    geom_point(data = rep.df %>% filter(TimePoint=="Day 4")%>% filter(Species == species),
+                aes(x=as.factor(Aggregation),y=.data[[y_var]], color =.data[[colorStrain]], shape = Region),
+               position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75),size=1)+
+    geom_point(data = region.df%>% filter(TimePoint=="Day 4")%>% filter(Species == species),
+               aes(x=as.factor(Aggregation),y=.data[[y_var]], color =.data[[colorStrain]],shape = Region),
+               size=3, position = position_dodge(width = .75) )+
+    geom_point(data = cond.df%>% filter(TimePoint=="Day 4") %>% filter(Species == species),
+               aes(x=as.factor(Aggregation),y=.data[[y_var]],  color =.data[[colorStrain]]),size=4, shape = 3,position = position_dodge(width = .75) )+
+    scale_y_log10(breaks = c(100, 10, 1, .1, .01), labels = c(100, 10, 1, .1, .01))+
+    facet_grid(.~Species)+
+    scale_shape_manual(values=c(16, 1))+
+    ggtitle(title)+
+    labs(y = paste(y_var,"(%)"),x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    scale_color_brewer(palette = "Set1")+
+    theme_cowplot()+
+    panel_border() +
+    theme(plot.title = element_text(hjust = 0.5), 
+        strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
+        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
+}
+###---Figure 1D
+PlotAggPlank(plankAggHistRep%>% filter(SaStrain %in% c("Sa mono", "co-wt")),
+             plankAggHistCond%>% filter(SaStrain %in% c("Sa mono", "co-wt")),
+             plankAggHistCondReg%>% filter(SaStrain %in% c("Sa mono", "co-wt")),
+             "AgPlNormBiomass", "Normalized Biomass", "S. aureus", "Culture")
+
+PlotAggPlank(plankAggHistRep,
+             plankAggHistCond,
+             plankAggHistCondReg,
+             "AgPlNormBiomass", "Normalized Biomass", "S. aureus", "SaStrain")
+
+
 ggplot()+
   geom_jitter(data = plankAggHistRep,aes(x=as.factor(Aggregation),y=AgPlNormFrequency,  color =Condition ),size=3, height = 0, width = .2, shape = 1)+ 
   geom_point(data = plankAggHistCond,aes(x=as.factor(Aggregation),y=AgPlNormFrequency,  color =Condition,group = Condition),size=4, shape = 16, position = position_dodge(width = .3) )+
@@ -367,8 +603,10 @@ ggplot()+
   theme(plot.title = element_text(hjust = 0.5)) 
 #Plot Biomass
 ggplot()+
-  geom_jitter(data = plankAggHistRep,aes(x=as.factor(Aggregation),y=AgPlNormBiomass,  color =Condition ),size=2, height = 0, width = .2, shape = 1)+
-  geom_point(data = plankAggHistCond,aes(x=as.factor(Aggregation),y=AgPlNormBiomass,  color =Condition),size=5, shape = 16, position = position_dodge2(width = .5)) +
+  geom_jitter(data = plankAggHistRep,
+              aes(x=as.factor(Aggregation),y=AgPlNormBiomass,  color =Condition ),size=2, height = 0, width = .2, shape = 1)+
+  geom_point(data = plankAggHistCond,
+             aes(x=as.factor(Aggregation),y=AgPlNormBiomass,  color =Condition),size=5, shape = 16, position = position_dodge2(width = .5)) +
   facet_grid(Species~TimePoint)+
   ggtitle("Normalized Biomass (%) Aggs vs Plank")+
   labs(y = "Normalized Biomass (%)",x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+ 
@@ -388,7 +626,6 @@ plankAggHistSummary<-plankAggHistRep %>% group_by(Species,TimePoint,Culture,Stra
             SEBiomass = std.error(AgPlNormBiomass))
 
 #Plot using the code from the paper
-
 PlotAggregateBiomassContribution<-function(species){
 ggplot()+
   geom_col(data = plankAggHistSummary %>% filter(Aggregation=="Aggregate") %>% filter(Species==species), aes(x=Strain,y=MeanBiomass, fill = Culture),
@@ -516,9 +753,6 @@ ggplot()+
 }
 PlotBiomassAggregateSize2("P. aeruginosa")
 PlotBiomassAggregateSize2("S. aureus")
-
-
-
 #####
 ```
 
@@ -555,7 +789,7 @@ ReadSliceFile<-function(file, timepoint, condition, replicate, sampleCode){#make
 #####
 #get data from csv file
 slicedData<-GetSliceData()
-#get metadata
+ #get metadata
 metaData.df <-read.csv('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/images metadata.csv', header = TRUE)
 metaData.df$SampleCode<-as.factor(metaData.df$SampleCode)
 
@@ -581,15 +815,22 @@ sliceDataMeta<-sliceDataMeta %>% filter(!SampleCode == "pawt_d4_05")
 sliceDataMeta<-sliceDataMeta %>% filter(!SampleCode == "phz_d4_06")
 
 #rename variables
-sliceDataMeta$Channel <- factor(sliceDataMeta$Channel, levels = c(1, 2, 3),labels = c('S. aureus','P. aeruginosa','host'))
+sliceDataMeta<-sliceDataMeta %>% mutate(Species = recode(Channel,"1" ='S. aureus',"2" ='P. aeruginosa',"3" ='host'))
 sliceDataMeta$Condition<- factor(sliceDataMeta$Condition, levels = c("mono", "pawt","papqsL", "paphz", "wt", "pqsL", "phz"),
                                   labels = c('Sa mono', 'Pa wt mono','pqsL mono','phz mono','wt co', 'pqsL co', 'phz co'))
 sliceDataMeta$TimePoint <- factor(sliceDataMeta$TimePoint, levels = c("d1", "d4"),labels = c('Day 1','Day 4'))
 sliceDataMeta<-sliceDataMeta %>% mutate(Culture = recode(Condition, 'Sa mono' = "mono", 'Pa wt mono' = "mono",'pqsL mono'= "mono",'phz mono'= "mono",'wt co'= "co", 'pqsL co'= "co", 'phz co'= "co"))
 sliceDataMeta<-sliceDataMeta%>% mutate(Strain = recode(Condition, 'Sa mono' = "Sa", 'Pa wt mono' = "wt",'pqsL mono'= "pqsL",'phz mono'= "phz",'wt co'= "wt", 'pqsL co'= "pqsL", 'phz co'= "phz"))
-
+#add useful metrics
+sliceDataMeta<-sliceDataMeta%>% filter(!Channel == "3") %>% mutate(Height = Zdim*Slice) %>% group_by(SampleCode)%>% mutate(MaxHeight = max(Height)) 
 #calculate relative biomass
-sliceDataMeta<-sliceDataMeta%>% filter(!Channel == "host") %>% mutate(Height = Zdim*Slice) %>% group_by(SampleCode, Channel) %>% mutate(TotalBiomass = sum(Biomass)) %>% ungroup() %>% mutate(NormBiomass = Biomass/TotalBiomass*100) 
+##For all samples
+
+sliceDataMetaAll<-sliceDataMeta%>% group_by(SampleCode, Channel) %>% mutate(TotalBiomass = sum(Biomass)) %>% ungroup() %>% mutate(NormBiomass = Biomass/TotalBiomass*100) 
+
+sliceDataSumary<-sliceDataMeta %>% group_by(SampleCode, TimePoint, Strain, Culture, MaxHeight)%>% summarise() %>% unique()
+
+sliceDataClean<-sliceDataMeta %>% filter(MaxHeight>60) %>% filter(Height<60) %>% filter(TimePoint=="Day 4") %>% group_by(SampleCode, Channel) %>% mutate(TotalBiomass = sum(Biomass)) %>% ungroup() %>% mutate(NormBiomass = Biomass/TotalBiomass*100) 
 
 #####
 #Plot Data
@@ -608,17 +849,47 @@ ggplot()+
 #####
 #Filter by Max height of the sample
 #####  
-sliceDataSum<-sliceDataMeta %>% group_by(SampleCode) %>% mutate(MaxHeight = max(Height)) %>% ungroup()
+  #graph the samples height
+  ggplot()+
+    geom_col(data = sliceDataSumary %>% filter(TimePoint=="Day 4"),aes(x=SampleCode,y=MaxHeight, color = Strain, fill =Culture ),size=2)+
+    geom_hline(yintercept = 50)+
+    labs(title ="title")+
+    scale_color_brewer(palette = "Set2")+
+    scale_fill_brewer(palette = "Set1")+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
 
-ggplot()+
-  geom_smooth(data = sliceDataSum %>% filter(MaxHeight>50 & MaxHeight<120) ,aes(y=NormBiomass,x=Height, color = Strain, linetype = Culture),size=2)+
-  geom_hline(yintercept = 0, linetype = "dashed", color = "gray")+
-  theme_cowplot()+
-  scale_color_brewer(palette = "Set1")+
-  facet_grid(Channel~TimePoint)+
-  panel_border() +
-  coord_flip()+
-  theme(plot.title = element_text(hjust = 0.5))
+PlotZsliceSa<-function(){  
+  ggplot()+
+    geom_smooth(data = sliceDataClean %>% filter(Species == "S. aureus"),aes(y=NormBiomass,x=Height, color = Region),size=2, alpha = .1)+
+    #geom_point(data = sliceDataClean%>% filter(Species == species),aes(y=NormBiomass,x=Height, color = Region),size=1, alpha = .5)+
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray")+
+    theme_cowplot()+
+    scale_color_brewer(palette = "Set1")+
+    facet_grid(Strain~.)+
+    scale_shape_manual(values = c(1, 3))+
+    panel_border() +
+    coord_flip()+
+    theme(plot.title = element_text(hjust = 0.5))}
+PlotZslicePa<-function(){  
+  ggplot()+
+    geom_smooth(data = sliceDataClean %>% filter(Species == "P. aeruginosa") %>% filter(Culture=="co"),aes(y=NormBiomass,x=Height, color = Region),size=2, alpha = .1)+
+    #geom_point(data = sliceDataClean%>% filter(Species == species),aes(y=NormBiomass,x=Height, color = Region),size=1, alpha = .5)+
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray")+
+    theme_cowplot()+
+    scale_color_brewer(palette = "Set1")+
+    facet_grid(Strain~.)+
+    scale_shape_manual(values = c(1, 3))+
+    panel_border() +
+    coord_flip()+
+    theme(plot.title = element_text(hjust = 0.5))}
+PlotZslicePa()
+
+
+PlotZsliceSa()
+
+
+
 
 ```
 
