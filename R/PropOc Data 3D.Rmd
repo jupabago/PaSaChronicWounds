@@ -316,9 +316,10 @@ PlotCVrelation("Pa->Sa")
 PlotCVrelation("Sa->Sa")
 PlotCVrelation("Sa->Pa")
 ```
-# Importing whole data sets to identify distribution of data
-```{r read whole data sets}
 
+The chunk below is the only one aplicable to the SaPa chronic wounds project, all the other ones are just for reference
+
+```{r SAPA Chorinc wounds paper chunk}
 ReadPropOcFile<-function(file){
     propOcData<-read.csv(file,header = T)
     fileName<-str_split(basename(file), "\\.")[[1]][1]#this selects the base file name and removes the ".csv"
@@ -427,7 +428,8 @@ rawPropOcDataClean$PropOc1[rawPropOcDataClean$PropOc1<0] = 0
 #make new data frame for downstream analysis
 PropOcDataFiltered<-rawPropOcDataClean %>% filter(PropOc<1.5) %>% filter(PropOc>=0)
 
-
+#Functions to make histograms of proportional occupancy values
+#####
 GetHistograms<-function(inputData){
 data<-inputData%>% group_by(SampleCode,Distance, source) 
   dataList<-group_split(data)#split data fram into a list of dataframes with a single distance and from a single source
@@ -438,8 +440,8 @@ data<-inputData%>% group_by(SampleCode,Distance, source)
 HistogramDistance <- function(df) {
   #histogram<- hist(df$PropOc) 
   histogram<- hist(df$PropOc1, breaks = seq.int(0,1,.01)) 
-  #histogram<- hist(df$PropOc, breaks = c(0,lseq(.001,1.03,100)))
-  #histogram<- hist(df$PropOc, breaks = c(0,lseq(.0001,1.03,100)))
+  #histogram<- hist(df$PropOc1, breaks = c(0,lseq(.001,1.03,100)))
+  #histogram<- hist(df$PropOc1, breaks = c(0,lseq(.0001,1.03,100)))
   output<-data.frame(histogram$mids,histogram$counts, histogram$density)
   colnames(output)<-c("Value", "Frequency", "Density")
   output<-output %>% mutate(Distance = df$Distance[[1]]) %>% filter(!Frequency==0)
@@ -447,23 +449,43 @@ HistogramDistance <- function(df) {
   output<-output %>% mutate(Sample = df$SampleCode[[1]])
   return(output)
 }
+#####
 #Run histograms for data
 propOcHistogramData<-GetHistograms(PropOcDataFiltered)#from here what matters is the density since it is freq/total*#ofbins
 propOcHistogramData<-propOcHistogramData %>% group_by(Sample, Source, Distance) %>% mutate(count = sum(Frequency), NormDensity = Density/100) %>% ungroup()
+#Some Quality control by removing samples with low counts:
+#Quality control for low counts
+lowcounts<-propOcHistogramData %>% filter(count<500)
+lowcountssummary<-lowcounts %>% group_by(Sample, Source) %>% summarize(Lowcounts = n(), meanCounts = mean(count))
+
+lowsamples<-unique(lowcounts$Sample)
+
+ggplot()+
+  geom_point(data = lowcounts,aes(x=Sample,y=count, color = Distance, shape = Source))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+lowCountSamples<-bind_rows(propOcHistogramData %>% filter(Sample == "mono_d1_02"),
+                           propOcHistogramData %>% filter(Sample == "phz_d4_08"),
+                           propOcHistogramData %>% filter(Sample == "wt_d4_11") %>% filter(Source == "finalRG"))
+propOcHistogramData <- anti_join(propOcHistogramData, lowCountSamples)
+                               
 
 #plot distributions
 PlotAllPropOcData <- function(sample ) {
   ggplot()+ 
-    geom_point(data = propOcHistogramData %>% filter(Sample ==sample),aes(x=Value,y=NormDensity, color = Distance),size=2)+
+    geom_point(data = propOcHistogramData %>% filter(Sample ==sample),aes(x=Value,y=NormDensity, color = Distance),size=2, shape = 1)+
     scale_y_log10( breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
     scale_color_gradientn(colours = rainbow(5))+
+    labs(title =sample)+
     facet_wrap(.~Source)+
     theme_cowplot()+
     theme(plot.title = element_text(hjust = 0.5))
 }
-PlotAllPropOcData("wt_d1_05")#looks cool, so let's keep going...
+PlotAllPropOcData("wt_d4_05")#looks cool, so let's keep going...
 
 #now calculate the maximum frequency
+#####
 propOcMaxDensity<-propOcHistogramData %>% 
     group_by(Sample, Distance, Source)%>% 
     mutate(MaxDensity = max(NormDensity)) %>% 
@@ -481,10 +503,12 @@ propOcMaxDensity<-propOcHistogramData %>%
     theme_cowplot()+
     theme(plot.title = element_text(hjust = 0.5))
 }
-PlotMaxDensities("wt_d1_05")
-  #maximum distribution isn't super representative, so for the distribution, I calculated the value at which 50% of the population is found 
+PlotMaxDensities("pqsL_d4_03")
+#####
+#maximum frequency isn't super representative, so for the distribution, I calculated the value at which 50% of the population is found 
 
 #Median distribution
+#####
 getDeathCurve<-function(df){
   currentDensity = 0
   for (i in 1 : nrow(df)){
@@ -525,13 +549,14 @@ PlotPercentiles <- function(df) {
     theme(plot.title = element_text(hjust = 0.5))
   }
 PlotPercentiles(test50Percentile)#test case for sample wt_d1_05
+PlotPercentiles(propOcMidDensity %>% filter(Sample == "wt_d4_05", Source == "finalGR"))
 
 #Clean up data for plotting and doing stats
 ##Recover conditions
 
-PropOcDataFiltered1<-PropOcDataFiltered %>% group_by(Condition,TimePoint,SampleCode) %>% summarise(None = n()) %>% mutate(Sample = SampleCode)
+PropOcDataFiltered1<-PropOcDataFiltered %>% group_by(Condition,TimePoint,Region,SampleCode) %>% summarise(None = n()) %>% mutate(Sample = SampleCode)
 
-propOcMidDensitylabeled <-merge(propOcMidDensity,PropOcDataFiltered1)
+propOcMidDensitylabeled <-merge(propOcMidDensity,PropOcDataFiltered1)#Add condition and timepoint
 
 ##Make them factors
 propOcMidDensitylabeled$Condition <- factor(propOcMidDensitylabeled$Condition, levels = c("mono", "pawt","papqsL", "paphz", "wt", "pqsL", "phz"),labels = c('Sa mono', 'Pa wt mono','pqsL mono','phz mono','wt co', 'pqsL co', 'phz co'))
@@ -543,37 +568,241 @@ propOcMidDensitylabeled<-propOcMidDensitylabeled%>% mutate(Culture = recode(Cond
 
 propOcMidDensitylabeled<-propOcMidDensitylabeled%>% mutate(Strain = recode(Condition, 'Sa mono' = "Sa", 'Pa wt mono' = "wt",'pqsL mono'= "pqsL",'phz mono'= "phz",'wt co'= "wt", 'pqsL co'= "pqsL", 'phz co'= "phz"))
 
+#add region
+metaData.df <-read.csv('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/images metadata.csv', header = TRUE)
+metaData.df$SampleCode<-as.factor(metaData.df$SampleCode)
+metaData.df<-metaData.df %>% select(SampleCode, mouse, Position, size, Region, Zdim, xyDim,xySize)#
+propOcMidDensMetaLabel<-metaData.df %>%  merge(propOcMidDensitylabeled, by = "SampleCode")
 
+#include Region
+propOcMidDensityStatsRegion<-propOcMidDensMetaLabel %>% ungroup() %>% group_by(Condition,Culture,Strain,TimePoint,Region, Distance, Relation) %>% summarize(meanValue = mean(Value), sdValue = std.error(Value), medianValue = median(Value))
+#exclude region
+propOcMidDensityStats<-propOcMidDensMetaLabel %>% ungroup() %>% group_by(Condition,Culture,Strain,TimePoint,Distance, Relation) %>% summarize(meanValue = mean(Value), sdValue = std.error(Value), medianValue = median(Value))
 
-propOcMidDensityStats<-propOcMidDensitylabeled %>% ungroup() %>% group_by(Condition,Culture,Strain,TimePoint, Distance, Relation) %>% summarize(meanValue = mean(Value), sdValue = sd(Value), medianValue = median(Value))
-
-ggplot()+#linear
-    geom_point(data = propOcMidDensityStats %>% filter(Relation== "Pa->Pa"),aes(y=meanValue, x = Distance,color=Condition, shape = "Mean"),size=2)+
-    geom_point(data = propOcMidDensityStats %>% filter(Relation== "Pa->Pa"),aes(y=medianValue, x = Distance,color=Condition,shape = "Median"),size=2)+
-    labs(title ="mean 50 percentile Density")+
+PlotMeanMidDensityPORegion<-function(relation){
+  ggplot()+
+    geom_pointrange(data = propOcMidDensityStatsRegion %>% filter(TimePoint == "Day 4", Relation== relation),aes(y=meanValue,ymin= meanValue-(sdValue/2), ymax = meanValue+(sdValue/2), x = Distance,color=Condition, shape = Region),size=1, position = position_dodge(width = .6))+
+    #geom_point(data = propOcMidDensityStats %>% filter(Relation== "Pa->Sa"),aes(y=medianValue, x = Distance,color=Condition,shape = "Median"),size=2)+
     #scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
-    #scale_x_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
-    facet_grid(Relation ~ TimePoint)+
-    #scale_color_gradientn(colours = rainbow(5))+
-    #scale_shape_manual(values=c(0,1,2, 15,16,17))+
+    labs(title ="mean 50 percentile Density")+
+    facet_grid(Relation ~ .)+
     scale_color_brewer(palette = "Set1")+
     theme_cowplot()+
     theme(plot.title = element_text(hjust = 0.5))
+}
+#Including Edge
+PlotMeanMidDensityPORegion("Pa->Sa")
+PlotMeanMidDensityPORegion("Sa->Pa")#this is log exponential
+PlotMeanMidDensityPORegion("Pa->Pa")
+PlotMeanMidDensityPORegion("Sa->Sa")
 
-ggplot()+#linear
-    geom_point(data = propOcMidDensityStats %>% filter(Relation== "Sa->Sa"),aes(y=meanValue, x = Distance,color=Culture, shape = "Mean"),size=2)+
-    geom_point(data = propOcMidDensityStats %>% filter(Relation== "Sa->Sa"),aes(y=medianValue, x = Distance,color=Culture,shape = "Median"),size=2)+
-    labs(title ="mean 50 percentile Density")+
+PlotMeanMidDensityPO<-function(relation){
+  ggplot()+
+    geom_pointrange(data = propOcMidDensityStats %>% filter(TimePoint == "Day 4", Relation== relation),aes(y=meanValue,ymin= meanValue-(sdValue/2), ymax = meanValue+(sdValue/2), x = Distance,color=Condition),size=1, position = position_dodge(width = .6))+
+    #geom_point(data = propOcMidDensityStats %>% filter(Relation== "Pa->Sa"),aes(y=medianValue, x = Distance,color=Condition,shape = "Median"),size=2)+
     #scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
-    #scale_x_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
-    facet_grid(Strain ~ TimePoint)+
-    #scale_color_gradientn(colours = rainbow(5))+
-    #scale_shape_manual(values=c(0,1,2, 15,16,17))+
+    labs(title ="mean 50 percentile Density")+
+    facet_grid(Relation ~ .)+
     scale_color_brewer(palette = "Set1")+
     theme_cowplot()+
     theme(plot.title = element_text(hjust = 0.5))
+}
+PlotMeanMidDensityPO("Pa->Sa")
+PlotMeanMidDensityPO("Sa->Pa")#this is log exponential
+PlotMeanMidDensityPO("Pa->Pa")
+PlotMeanMidDensityPO("Sa->Sa")
+#this wat combines the data accroding to the focus species
+PlotMeanMidDensityPOCenter<-function(){
+  ggplot()+
+    geom_pointrange(data = propOcMidDensityStats %>% filter(TimePoint == "Day 4", Culture == "co") %>% filter(Relation%in%c("Sa->Sa","Sa->Pa")),
+    #geom_pointrange(data = propOcMidDensityStats %>% filter(TimePoint == "Day 4", Culture == "co") %>% filter(Relation%in%c("Pa->Sa","Pa->Pa")),
+                      aes(y=meanValue,ymin= meanValue-(sdValue/2), ymax = meanValue+(sdValue/2), x = Distance,color=Relation),size=1, position = position_dodge(width = .6))+
+    #geom_point(data = propOcMidDensityStats %>% filter(Relation== "Pa->Sa"),aes(y=medianValue, x = Distance,color=Condition,shape = "Median"),size=2)+
+    #scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    labs(title ="mean 50 percentile Density")+
+    facet_grid(.~Condition )+
+    scale_color_brewer(palette = "Set1")+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+}
+PlotMeanMidDensityPOCenter()
+PlotMeanMidDensityPOCenterRegion<-function(){
+  ggplot()+
+    #geom_pointrange(data = propOcMidDensityStatsRegion %>% filter(TimePoint == "Day 4", Culture == "co") %>% filter(Relation%in%c("Sa->Sa","Sa->Pa")),
+    geom_pointrange(data = propOcMidDensityStatsRegion %>% filter(TimePoint == "Day 4", Culture == "co") %>% filter(Relation%in%c("Pa->Sa","Pa->Pa")),
+                      aes(y=meanValue,ymin= meanValue-(sdValue/2), ymax = meanValue+(sdValue/2), x = Distance,shape = Region,color=Relation),
+    size=1, position = position_dodge(width = .6))+
+    #geom_point(data = propOcMidDensityStats %>% filter(Relation== "Pa->Sa"),aes(y=medianValue, x = Distance,color=Condition,shape = "Median"),size=2)+
+    #scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    labs(title ="mean 50 percentile Density")+
+    facet_grid(.~Condition )+
+    scale_color_brewer(palette = "Set1")+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+}
+PlotMeanMidDensityPOCenterRegion()
+#Calculate empty space
+
+emptySpaceRgn<-propOcMidDensityStatsRegion %>% mutate(Focus = recode(Relation, "Pa->Sa" = "Pa","Pa->Pa" = "Pa","Sa->Sa" = "Sa","Sa->Pa" = "Sa")) %>% group_by(Focus, Distance, Condition, TimePoint, Region) %>% mutate(EmptySpace = 1-(sum(meanValue)), SDEmptySpace = sum(sdValue))
+
+emptySpace<-propOcMidDensityStats %>% mutate(Focus = recode(Relation, "Pa->Sa" = "Pa","Pa->Pa" = "Pa","Sa->Sa" = "Sa","Sa->Pa" = "Sa")) %>% group_by(Focus, Distance, Condition, TimePoint) %>% mutate(EmptySpace = 1-(sum(meanValue)), SDEmptySpace = sum(sdValue))
+PlotEmptySpace<-function(focus){
+  ggplot()+
+    geom_pointrange(data = emptySpace %>% filter(TimePoint == "Day 4", Focus== focus),aes(y=EmptySpace,ymin= EmptySpace-(SDEmptySpace/2), ymax = EmptySpace+(SDEmptySpace/2), x = Distance,color=Strain),size=1, position = position_dodge(width = .6))+
+    #geom_point(data = propOcMidDensityStats %>% filter(Relation== "Pa->Sa"),aes(y=medianValue, x = Distance,color=Condition,shape = "Median"),size=2)+
+    #scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    labs(title ="mean 50 percentile Density")+
+    facet_grid( .~Culture)+
+    scale_color_brewer(palette = "Set1")+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+}
+PlotEmptySpace("Pa")
+PlotEmptySpace("Sa")
+
+PlotEmptySpaceRegion<-function(focus){
+  ggplot()+
+    geom_pointrange(data = emptySpaceRgn %>% filter(TimePoint == "Day 4", Focus== focus),
+                    aes(y=EmptySpace,ymin= EmptySpace-(SDEmptySpace/2), ymax = EmptySpace+(SDEmptySpace/2), x = Distance,color=Strain, shape = Region),size=1, position = position_dodge(width = .6))+
+    #geom_point(data = propOcMidDensityStats %>% filter(Relation== "Pa->Sa"),aes(y=medianValue, x = Distance,color=Condition,shape = "Median"),size=2)+
+    #scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+    labs(title ="mean 50 percentile Density")+
+    facet_grid( .~Culture)+
+    scale_color_brewer(palette = "Set1")+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+}
+PlotEmptySpaceRegion("Pa")
+PlotEmptySpaceRegion("Sa")
 
 
+#Calculate Enrichment
+propOcEnrichment<- propOcMidDensitylabeled %>% group_by(SampleCode,Relation)%>%
+  select(Value, Density, Distance, Relation,Sample, Strain,TimePoint, Condition, Culture, Strain,SampleCode) %>% mutate(Enrichment = max(Value)) %>%
+  mutate(EnrichmentCh = ifelse(Enrichment == Value, 1, 0 )) %>% filter(EnrichmentCh==1) %>% 
+  mutate(DoubledValues = sum(EnrichmentCh)) %>% ungroup()#find max
+propOcEnrichment$SampleCode<-as.factor(propOcEnrichment$SampleCode)#make samples a factor
+
+metaData.df <-read.csv('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/images metadata.csv', header = TRUE)
+metaData.df$SampleCode<-as.factor(metaData.df$SampleCode)
+
+
+metaData.df<-metaData.df %>% select(SampleCode, mouse, Position, size, Region, Zdim, xyDim,xySize)
+pOEnrMeta<-metaData.df %>%  merge(propOcEnrichment, by = "SampleCode")
+
+#Plotting Enrichment per Relation
+PlotEnrichment<-function(relation){
+  ggplot()+
+    geom_point(data = pOEnrMeta %>% filter(Relation == relation),aes(y=Distance,x = Sample,shape = Region, color =Condition),size=2)+
+    geom_point(data = pOEnrMeta %>% filter(Relation == relation),aes(y=WmeanDist, x = Sample, shape = Region), color ="BLACK",size=2)+
+    labs(title =paste("50 percentile Enrichment", relation))+
+    facet_grid(.~TimePoint,scales = "free", space = "free")+
+    #scale_color_gradientn(colours = rainbow(5))+
+    #scale_shape_manual(values=c(0,1,2, 15,16,17))+
+    ylim(0,30)+
+    theme_cowplot()+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),plot.title = element_text(hjust = 0.5))+
+    panel_border() 
+}
+PlotEnrichment("Pa->Sa")
+PlotEnrichment("Sa->Pa")
+PlotEnrichment("Sa->Sa")
+PlotEnrichment("Pa->Pa")
+
+#It's unclear how to deal with the issue of multiple enrichment distances, but I think doing a weighted mean makes the most sense:
+pOEnrMetaClean<-pOEnrMeta %>% group_by(SampleCode,Condition,TimePoint, Region, Relation)%>%summarise(WmeanDist =weighted.mean(Distance, Density))
+#now calculate the Mean per condition:
+pOEnrMetaStatsRegion<-pOEnrMetaClean %>% group_by(Condition,TimePoint, Region, Relation) %>%
+  summarise(meanED = mean(WmeanDist),medianED = median(WmeanDist), SDED = sd(WmeanDist), SEED = std.error(WmeanDist),per25 = quantile(WmeanDist, .25), per75 = quantile(WmeanDist, .75))
+
+pOEnrMetaStats<-pOEnrMetaClean %>% group_by(Condition,TimePoint, Relation) %>%
+  summarise(meanED = mean(WmeanDist),medianED = median(WmeanDist), SDED = sd(WmeanDist), SEED = std.error(WmeanDist), per25 = quantile(WmeanDist, .25), per75 = quantile(WmeanDist, .75))
+
+#plot mean, weighted mean Enrichment distance from 50 percentile PO
+##First using region
+PlotMeanEnrichment50percent<-function(df1,df2){
+  ggplot()+
+    geom_pointrange(data = df1,aes(y=meanED,ymax=meanED+SEED,ymin=meanED-SEED, x = Condition,shape = Region),position = position_dodge(width = .5),size = .7)+
+  geom_point(data = df2,aes(y=WmeanDist,x = Condition, group = Region),position = position_dodge(width = .5),size=1, shape = 1)+
+    labs(y = expression(atop("Enrichment distance ("*mu*"m)",paste(italic("P. aeruginosa ") %->% italic("S. aureus"))))) +
+    #facet_grid(.~Relation,scales = "free", space = "free")+
+    theme_cowplot()+
+    #theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),plot.title = element_text(hjust = 0.5))+
+    theme(plot.title = element_text(hjust = 0.5),
+          strip.text = element_text(size = 12, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facets
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"))
+}
+PlotMeanEnrichment50percent(pOEnrMetaStatsRegion %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"),
+                            pOEnrMetaClean %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"))
+
+PlotMedianEnrichment50percent<-function(df1,df2){
+  ggplot()+
+    geom_pointrange(data = df1,aes(y=medianED,ymax=per25,ymin=per75, x = Condition,shape = Region),position = position_dodge(width = .5),size = .7)+
+  geom_jitter(data = df2,aes(y=WmeanDist,x = Condition),width = .5, height = 0,size=1, shape = 1)+
+    labs(y = expression(atop("Enrichment distance ("*mu*"m)",paste(italic("P. aeruginosa ") %->% italic("S. aureus"))))) +
+    #facet_grid(.~Relation,scales = "free", space = "free")+
+    theme_cowplot()+
+    #theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),plot.title = element_text(hjust = 0.5))+
+    theme(plot.title = element_text(hjust = 0.5),
+          strip.text = element_text(size = 12, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facets
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"))
+}
+PlotMedianEnrichment50percent(pOEnrMetaStatsRegion %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"),
+                            pOEnrMetaClean %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"))
+#then without region
+PlotMedianEnrichment50percentNRegion<-function(df1,df2){
+  ggplot()+
+    geom_pointrange(data = df1,aes(y=medianED,ymax=per25,ymin=per75, x = Condition),size = .7)+
+  geom_jitter(data = df2,aes(y=WmeanDist,x = Condition),width = .2, height = 0,size=1, shape = 1)+
+    labs(y = expression(atop("Enrichment distance ("*mu*"m)",paste(italic("P. aeruginosa ") %->% italic("S. aureus"))))) +
+    #facet_grid(.~Relation,scales = "free", space = "free")+
+    theme_cowplot()+
+    #theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),plot.title = element_text(hjust = 0.5))+
+    theme(plot.title = element_text(hjust = 0.5),
+          strip.text = element_text(size = 12, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facets
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"))
+}
+PlotMeanEnrichment50percentNRegion<-function(df1,df2){
+  ggplot()+
+    geom_pointrange(data = df1,aes(y=meanED,ymax=meanED+SEED,ymin=meanED-SEED, x = Condition),size = .7)+
+  geom_jitter(data = df2,aes(y=WmeanDist,x = Condition, group = Region),width = .2, height = 0,size=1, shape = 1)+
+    labs(y = expression(atop("Enrichment distance ("*mu*"m)",paste(italic("P. aeruginosa ") %->% italic("S. aureus"))))) +
+    #facet_grid(.~Relation,scales = "free", space = "free")+
+    theme_cowplot()+
+    #theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),plot.title = element_text(hjust = 0.5))+
+    theme(plot.title = element_text(hjust = 0.5),
+          strip.text = element_text(size = 12, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facets
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"))
+}
+
+PlotMeanEnrichment50percentNRegion(pOEnrMetaStats %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"),
+                            pOEnrMetaClean %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"))
+PlotMedianEnrichment50percentNRegion(pOEnrMetaStats %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"),
+                            pOEnrMetaClean %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"))
+
+#original figure 
+ggplot()+
+    geom_pointrange(data = pOEnrMetaStats,aes(y=meanED,ymax=meanED+SEED,ymin=meanED-SEED, x = Condition),position = position_dodge(width = .5))+
+  geom_jitter(data = pOEnrMetaClean,aes(y=WmeanDist,x = Condition),size=1, shape = 1, height = 0, width = .2)+
+    labs(y = expression("Enrichment distance ("*mu*"m)")) +
+    facet_grid(TimePoint~Relation,scales = "free", space = "free")+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5),
+          strip.text = element_text(size = 12, margin = margin(.1,0,.1,0, "cm")),#this is for the facets
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"))+
+    panel_border() 
+
+ggplot()+
+    geom_pointrange(data = pOEnrMetaStatsRegion,aes(y=meanED,ymax=meanED+SEED,ymin=meanED-SEED, shape = Region,x = Condition),
+                    position = position_dodge(width = .5))+
+    geom_point(data = pOEnrMetaClean,aes(y=WmeanDist,x = Condition, group = Region),position = position_dodge(width = .5),size=1, shape = 1)+
+    labs(y = expression("Enrichment distance ("*mu*"m)")) +
+    facet_grid(TimePoint~Relation,scales = "free", space = "free")+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5),
+          strip.text = element_text(size = 12,margin = margin(.1,0,.1,0, "cm")),#this is for the facets
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"))+
+    panel_border() 
 ```
 
 ```{r Original Whole PropOc frequency functions from mBio Paper -DONE}
@@ -819,7 +1048,7 @@ ggplot()+#log transform
 ```
 
 #Enrichment (distance at highest proportional occupancy) 
-```{r Enrichment}
+```{r Enrichment -DONE}
 #find the max proportional occupancy value from the 50 percentile
 
 allDeathCurvesLog2midAbsEnrichment<- allDeathCurvesLog2midAbs %>% group_by(Sample, Source)%>%
@@ -828,11 +1057,9 @@ allDeathCurvesLog2midAbsEnrichment<- allDeathCurvesLog2midAbs %>% group_by(Sampl
   mutate(DoubledValues = sum(EnrichmentCh)) %>% ungroup()#find max
 
 PlotEnrichment <- function(df) {
-ggplot()+#first run
+ggplot()+
     geom_point(data = df,aes(y=Distance, x = Sample, color = Enrichment, shape = Sample),size=2)+
     labs(title ="50 percentile Enrichment")+
-    #scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
-    #scale_x_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
     facet_wrap( ~ Source, ncol = 2)+
     scale_color_gradientn(colours = rainbow(5))+
     scale_shape_manual(values=c(0,1,2, 15,16,17))+

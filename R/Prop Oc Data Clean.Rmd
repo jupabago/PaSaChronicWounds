@@ -129,7 +129,7 @@ ggplot()+
 ```
 ```{r wrangling clean Data}
 
-#Add New variaible to the data frame capping the value pf propOc to 1
+#Add New variable to the data frame capping the value pf propOc to 1
 rawPropOcDataClean$PropOc1= rawPropOcDataClean$PropOc
 rawPropOcDataClean$PropOc1[rawPropOcDataClean$PropOc1>1] = 1
 rawPropOcDataClean$PropOc1[rawPropOcDataClean$PropOc1<0] = 0
@@ -144,6 +144,9 @@ PropOcDataFiltered$Replicate<-as.factor(PropOcDataFiltered$Replicate)
 
 
 #From this point on there are at least two ways to move forward. The simplest one is to get the mean, mode and variance in the data
+```
+
+```{r meanPO}
 meanPOData<-PropOcDataFiltered %>% group_by(SampleCode, TimePoint, source, Distance, Condition) %>% summarise(MeanPO = mean(PropOc1), MedianPO = median(PropOc1), SDPO = sd(PropOc1), SEPO = std.error(PropOc1))
 
 #label and merge with metadata for plotting, output of this is pOMeanMeta dataframe used for plots
@@ -181,7 +184,60 @@ PlotMeanPOs("Sa->Sa")
 PlotMeanPOs("Pa->Pa")
 #####
 
-#Calculate the Enrichment
+###Moving forward I could calculate the mean PO for all samples and then get the enrichment from there or calculate the enrichment and then get mean enrichment for all samples. I'll do the former first:
+
+#---Mean, then enrichment
+#####
+#Get the mean meanPO across samples
+##Group including Region
+pOMeanStatsRgn<-pOMeanMeta %>% ungroup() %>% group_by(Condition,Culture,Strain,TimePoint, Distance, Relation, Region) %>% summarize(meanValue = mean(MeanPO), sdValue = sd(MeanPO), medianValue = median(MeanPO))
+##Group without region
+pOMeanStatsNoRgn<-pOMeanMeta %>% ungroup() %>% group_by(Condition,Culture,Strain,TimePoint, Distance, Relation) %>% summarize(meanValue = mean(MeanPO), sdValue = sd(MeanPO), medianValue = median(MeanPO))
+
+PlotMeanMeanPO<-function(df,relation){
+  ggplot()+
+    #geom_point(data = df %>% filter(Relation == relation),aes(y=meanValue,x = Distance,shape = Region,  color =Condition),size=2)+
+    #geom_pointrange(data = df %>% filter(Relation == relation),aes(y=meanValue,ymax=meanValue+sdValue,ymin=meanValue-sdValue,x = Distance,shape = Region,  color =Condition))+
+    geom_pointrange(data = df %>% filter(Relation == relation),aes(y=meanValue,ymax=meanValue+sdValue,ymin=meanValue-sdValue,x = Distance,color =Culture, shape = Region), position = position_dodge(width = .5))+
+    #geom_label(data = propOcEnrichment %>% filter(Relation == relation),aes(y=30, x = Sample, label = Value),size=2)+
+    labs(title =paste("Mean MeanPO", relation))+
+    facet_grid(Strain~TimePoint,scales = "free", space = "free")+
+    #scale_color_gradientn(colours = rainbow(5))+
+    #scale_shape_manual(values=c(0,1,2, 15,16,17))+
+    theme_cowplot()+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),plot.title = element_text(hjust = 0.5))
+}
+PlotMeanMeanPO(pOMeanStatsRgn, "Pa->Sa")
+PlotMeanMeanPO(pOMeanStatsNoRgn, "Pa->Sa")
+PlotMeanMeanPO(pOMeanStatsRgn,"Sa->Pa")
+PlotMeanMeanPO(pOMeanStatsNoRgn,"Sa->Pa")
+PlotMeanMeanPO(pOMeanStatsRgn,"Sa->Sa")
+PlotMeanMeanPO(pOMeanStatsNoRgn,"Sa->Sa")
+PlotMeanMeanPO(pOMeanStatsRgn,"Pa->Pa")
+PlotMeanMeanPO(pOMeanStatsNoRgn,"Pa->Pa")
+
+pOMeanEnri<- pOMeanStatsRgn %>% group_by(Condition,Culture, Strain, TimePoint,Relation, Region)%>% 
+  mutate(Enrichment = max(meanValue)) %>%
+  mutate(EnrichmentCh = ifelse(Enrichment == meanValue, 1, 0 )) %>% filter(EnrichmentCh==1) %>% 
+  mutate(DoubledValues = sum(EnrichmentCh)) %>% ungroup()#find max
+
+#PlotMeanEnrichment<-function(relation){
+  ggplot()+
+    geom_point(data = pOMeanEnri,aes(y=Distance,x = Condition,color = Region),position = position_dodge(width = .5),size=2)+
+    #geom_label(data = propOcEnrichment %>% filter(Relation == relation),aes(y=30, x = Sample, label = Value),size=2)+
+    labs(title =paste("Enrichment from mean PO"))+
+    facet_grid(TimePoint~Relation,scales = "free", space = "free")+
+    #scale_color_gradientn(colours = rainbow(5))+
+    #scale_shape_manual(values=c(0,1,2, 15,16,17))+
+    theme_cowplot()+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),plot.title = element_text(hjust = 0.5))+
+    panel_border() 
+#}
+
+#####
+#---Enrichment, then mean
+#####
+  #Calculate the Enrichment for all samples
 pOcEnriMean<- pOMeanMeta %>% group_by(SampleCode,Relation)%>% mutate(Enrichment = max(MeanPO)) %>%
   mutate(EnrichmentCh = ifelse(Enrichment == MeanPO, 1, 0 )) %>% filter(EnrichmentCh==1) %>% 
   mutate(DoubledValues = sum(EnrichmentCh)) %>% ungroup()#find max
@@ -206,9 +262,5 @@ PlotEnrichmentMean("Pa->Sa")
 PlotEnrichmentMean("Sa->Pa")
 PlotEnrichmentMean("Sa->Sa")
 PlotEnrichmentMean("Pa->Pa")
-
-#Get stats across samples
-pOMeanStatsRgn<-pOMeanMeta %>% ungroup() %>% group_by(Condition,Culture,Strain,TimePoint, Distance, Relation, Region) %>% summarize(meanValue = mean(MeanPO), sdValue = sd(MeanPO), medianValue = median(MeanPO))
-
-
+#####
 ```
