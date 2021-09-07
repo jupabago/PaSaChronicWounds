@@ -13,7 +13,7 @@ xySize = .415; %.208 or .132
 zSize = .52; %.365 or .361
 Tiff2Data (rawTifPath,binTifPath,aggsFilePath,slicedAggsFilePath, xySize, zSize);
 end
-%}
+%
 
 for sampleNumber = 1:10
 iterateSamples('paphz_d4_',sampleNumber,.415,.52)
@@ -26,13 +26,19 @@ end
 for sampleNumber = 1:9
 iterateSamples('pawt_d4_',sampleNumber,.208,.52)
 end
-
+%}
+iterateSamples('phz_d4_',14,.208,.52)
 function iterateSamples(sampleName, sampleNum,xy,z)
-
-rawTifPathBase = '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks New/';
+rawTifPathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks New/';%Laptop
+binTifPathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/';
+aggsFilePathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists/'; %names are different
+slicedAggsFilePathBase = '/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/Results per slice/'; %names are different
+%{
+rawTifPathBase = '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Tiff Stacks New/';%Thor
 binTifPathBase = '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Binary Images/';
 aggsFilePathBase = '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Aggregate lists/'; %names are different
 slicedAggsFilePathBase = '/run/user/937561/gvfs/smb-share:server=130.207.66.142,share=raw_data/Confocal/Carolyn/2020/Chronic wounds/Results per slice/'; %names are different
+%}
 rawTifPath = [rawTifPathBase,sampleName,GetNum(sampleNum),'/'];
 binTifPath = [binTifPathBase,sampleName,GetNum(sampleNum),'/'];
 aggsFilePath = [aggsFilePathBase,sampleName,GetNum(sampleNum)];
@@ -78,8 +84,7 @@ toc
 disp('done');
 end
 
-
-function filteredVolume = FilterImage(volume, wienerSize)
+function filteredVolume = FilterImage(volume, wienerSize)%this function ecides what is bacteria and what is background
 [width, height,slices] = size(volume);
 filteredVolume = zeros(width, height, slices);
 for slice= 1:slices

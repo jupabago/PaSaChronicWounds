@@ -4,7 +4,7 @@
 #'
 #'these functions were optimized for capped spheres on 10/14/19
 #'
-SlicesTo3D<-function(filesList,channel,side){
+SlicesTo3D<-function(filesList){
   image1<-readTiff(filesList[1])#read first image to get its dimensions
   image3D <- array(0, c(image1@size[1], image1@size[2], length(filesList)))#preallocate array for image given using image dimensions
   for(i in 1:length(filesList)){#keep in mind that it is not zero-index

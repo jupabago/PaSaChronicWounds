@@ -25,6 +25,7 @@ library(rdist)
 library("vcd")#this is fro fitting models to data
 library(viridis)#color palette
 library(gganimate)#gifs for ggplot
+library(stringr)
 
 lseq <- function(from, to, length.out) {
   # logarithmic spaced sequence
