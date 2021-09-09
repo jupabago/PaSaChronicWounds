@@ -148,6 +148,31 @@ summary(PaAggsAov)
 TukeyHSD(PaAggsAov)#wt~pqsL p = 0.06, wt~phz p = 0.003
 summary(SaAggsAov)
 TukeyHSD(SaAggsAov)#wt~pqsL p = 0.03
+###Core vs edge within mutants
+PaPqsLmassE<-aggregateListSummaryReplicate %>% filter(Species =="P. aeruginosa",TimePoint =="Day 4",Strain == "pqsL",Culture == "co",Region == "edge")
+PaPqsLmassC<-aggregateListSummaryReplicate %>% filter(Species =="P. aeruginosa",TimePoint =="Day 4",Strain == "pqsL",Culture == "co",Region == "core")
+PaPhzmassE<-aggregateListSummaryReplicate %>% filter(Species == "P. aeruginosa",TimePoint =="Day 4",Strain == "phz",Culture == "co",Region == "edge")
+PaPhzmassC<-aggregateListSummaryReplicate %>% filter(Species == "P. aeruginosa",TimePoint =="Day 4",Strain == "phz",Culture == "co",Region == "core")
+
+SaPqsLmassE<-aggregateListSummaryReplicate %>% filter(Species =="S. aureus",TimePoint =="Day 4",Strain == "pqsL",Culture == "co",Region == "edge")
+SaPqsLmassC<-aggregateListSummaryReplicate %>% filter(Species =="S. aureus",TimePoint =="Day 4",Strain == "pqsL",Culture == "co",Region == "core")
+SaPhzmassE<-aggregateListSummaryReplicate %>% filter(Species == "S. aureus",TimePoint =="Day 4",Strain == "phz",Culture == "co",Region == "edge")
+SaPhzmassC<-aggregateListSummaryReplicate %>% filter(Species == "S. aureus",TimePoint =="Day 4",Strain == "phz",Culture == "co",Region == "core")
+
+PaPqsLCoEdgevsCoreBiomassTtest<-t.test(x = PaPqsLmassE$biomass, y = PaPqsLmassC$biomass, paired = F)
+PaPqsLCoEdgevsCoreAggsTtest<-t.test(x = PaPqsLmassE$Aggs, y = PaPqsLmassC$Aggs, paired = F)
+PaPhzCoEdgevsCoreBiomassTtest<-t.test(x = PaPhzmassE$biomass, y = PaPhzmassC$biomass, paired = F)
+PaPhzCoEdgevsCoreAggsTtest<-t.test(x = PaPhzmassE$Aggs, y = PaPhzmassC$Aggs, paired = F)
+
+SaPqsLCoEdgevsCoreBiomassTtest<-t.test(x = SaPqsLmassE$biomass, y = SaPqsLmassC$biomass, paired = F)
+SaPqsLCoEdgevsCoreAggsTtest<-t.test(x = SaPqsLmassE$Aggs, y = SaPqsLmassC$Aggs, paired = F)
+SaPhzCoEdgevsCoreBiomassTtest<-t.test(x = SaPhzmassE$biomass, y = SaPhzmassC$biomass, paired = F)
+SaPhzCoEdgevsCoreAggsTtest<-t.test(x = SaPhzmassE$Aggs, y = SaPhzmassC$Aggs, paired = F)
+
+tTestFigs2ABDataCvsE<-list(PaPqsLCoEdgevsCoreBiomassTtest,PaPqsLCoEdgevsCoreAggsTtest,PaPhzCoEdgevsCoreBiomassTtest,PaPhzCoEdgevsCoreAggsTtest,
+                           SaPqsLCoEdgevsCoreBiomassTtest,SaPqsLCoEdgevsCoreAggsTtest,SaPhzCoEdgevsCoreBiomassTtest,SaPhzCoEdgevsCoreAggsTtest)
+tTestFigs2ABTableCvsE<-bind_rows(map(tTestFigs1ABDataCvsE, TtestTable))
+
 
 ```
 
@@ -434,8 +459,10 @@ HistCondRegionSum<-HistConditionRegin %>%
   mutate(checkSumFreq =sum(NormalizedFrequency), checkSumBiomass = sum(NormalizedBiomass))
 #####
 
-#Stats for aggregates
+#Stats for aggregate frequency and biomass
+#####
 ##Mono vs Co
+###
 PaMono5<-HistReplicateSummary %>% filter(Species == "P. aeruginosa" & TimePoint == "Day 4", Strain == "wt", Culture == "mono",LogBin == "(.5, 5]")
 PaCo5<-HistReplicateSummary %>% filter(Species == "P. aeruginosa" & TimePoint == "Day 4", Strain == "wt", Culture == "co",LogBin == "(.5, 5]")
 PaMono10<-HistReplicateSummary %>% filter(Species == "P. aeruginosa" & TimePoint == "Day 4", Strain == "wt", Culture == "mono",LogBin == "(5, 10]")
@@ -464,7 +491,8 @@ SaMonoCo100FreqTtest  <-t.test(x = SaMono100$NormalizedFrequency, y = SaCo100$No
 tTestFigs1CDData<-list(PaMonoCo5BiomassTtest,PaMonoCo5FreqTtest,PaMonoCo10FreqTtest,PaMonoCo100FreqTtest,
                        SaMonoCo5BiomassTtest,SaMonoCo5FreqTtest,SaMonoCo10FreqTtest,SaMonoCo100FreqTtest)
 tTestFigs1CDTable<-bind_rows(map(tTestFigs1CDData, TtestTable))
-### Edge vs Core
+### Edge vs Core only co-cultures
+#####
 Pawt5E<-HistReplicateSummary%>% filter(Species=="P. aeruginosa",TimePoint=="Day 4",Strain == "wt", Culture == "co",LogBin == "(.5, 5]",Region == "edge")
 Pawt5C<-HistReplicateSummary%>% filter(Species=="P. aeruginosa",TimePoint== "Day 4",Strain == "wt",Culture == "co",LogBin == "(.5, 5]",Region == "core")
 Pawt10E<-HistReplicateSummary%>% filter(Species=="P. aeruginosa",TimePoint== "Day 4",Strain== "wt",Culture == "co",LogBin == "(5, 10]",Region == "edge")
@@ -489,10 +517,10 @@ Sawt5CorEdFreqTtest    <-t.test(x = Sawt5E$NormalizedFrequency, y = Sawt5C$Norma
 Sawt10CorEdFreqTtest   <-t.test(x = Sawt10E$NormalizedFrequency, y = Sawt10C$NormalizedFrequency, paired = F)
 Sawt100CorEdFreqTtest  <-t.test(x = Sawt100E$NormalizedFrequency, y = Sawt100C$NormalizedFrequency, paired = F)
 
-tTestFigs2ABDataCorEdge<-list(Pawt5CorEdBioTtest,Pawt5CorEdFreqTtest,Pawt10CorEdFreqTtest,Pawt100CorEdFreqTtest,
+tTestFigs1CDDataCorEdge<-list(Pawt5CorEdBioTtest,Pawt5CorEdFreqTtest,Pawt10CorEdFreqTtest,Pawt100CorEdFreqTtest,
                        Sawt5CorEdBioTtest,Sawt5CorEdFreqTtest,Sawt10CorEdFreqTtest,Sawt100CorEdFreqTtest)
 
-tTestFigs2ABTableCorEdge<-bind_rows(map(tTestFigs2ABDataCorEdge, TtestTable))
+tTestFigs1CDTableCorEdge<-bind_rows(map(tTestFigs1CDDataCorEdge, TtestTable))
 
 ##wt vs mutants
 # Compute the analysis of variance 
@@ -514,15 +542,41 @@ Safrequency10Aov <- aov(NormalizedFrequency ~ Strain, data = HistReplicateSummar
 Safrequency100Aov <- aov(NormalizedFrequency ~ Strain, data = HistReplicateSummary%>%
                        filter(Species == "S. aureus",TimePoint == "Day 4",Culture == "co",LogBin == "(10, 100]"))
 
-summary(Pabiomass5Aov)
-TukeyHSD(Pabiomass5Aov)
-# Summary of the analysis
+# Summary of the analysis #only showing significant values
 summary(Sabiomass5Aov)#*p = 0.07
 TukeyHSD(Sabiomass5Aov)#*p pqsL-wt 0.077
 summary(Safrequency10Aov)#*p = 0.005
 TukeyHSD(Safrequency10Aov)#*p pqsL-wt 0.003
 
+#bundling up bin and edge
+HistReplicateSummary$StrainRegion <- paste(HistReplicateSummary$Region, "-", HistReplicateSummary$Strain)
+
+Pabiomass5AovSR <- aov(NormalizedBiomass ~ StrainRegion, data = HistReplicateSummary%>%
+                     filter(Species == "P. aeruginosa",TimePoint == "Day 4",Culture == "co",LogBin == "(.5, 5]"))
+Pafrequency5AovSR <- aov(NormalizedFrequency ~ StrainRegion, data = HistReplicateSummary%>%
+                       filter(Species == "P. aeruginosa",TimePoint == "Day 4",Culture == "co",LogBin == "(.5, 5]"))
+Pafrequency10AovSR <- aov(NormalizedFrequency ~ StrainRegion, data = HistReplicateSummary%>%
+                       filter(Species == "P. aeruginosa",TimePoint == "Day 4",Culture == "co",LogBin == "(5, 10]"))
+Pafrequency100AovSR <- aov(NormalizedFrequency ~ StrainRegion, data = HistReplicateSummary%>%
+                       filter(Species == "P. aeruginosa",TimePoint == "Day 4",Culture == "co",LogBin == "(10, 100]"))
+##None of the Pa are significant
+Sabiomass5AovSR <- aov(NormalizedBiomass ~ StrainRegion, data = HistReplicateSummary%>%
+                     filter(Species == "S. aureus",TimePoint == "Day 4",Culture == "co",LogBin == "(.5, 5]")) 
+Safrequency5AovSR <- aov(NormalizedFrequency ~ StrainRegion, data = HistReplicateSummary%>%
+                       filter(Species == "S. aureus",TimePoint == "Day 4",Culture == "co",LogBin == "(.5, 5]"))
+Safrequency10AovSR <- aov(NormalizedFrequency ~ StrainRegion, data = HistReplicateSummary%>%
+                       filter(Species == "S. aureus",TimePoint == "Day 4",Culture == "co",LogBin == "(5, 10]"))
+Safrequency100AovSR <- aov(NormalizedFrequency ~ StrainRegion, data = HistReplicateSummary%>%
+                       filter(Species == "S. aureus",TimePoint == "Day 4",Culture == "co",LogBin == "(10, 100]"))
+summary(Sabiomass5AovSR)#
+TukeyHSD(Sabiomass5AovSR)#*p core wt vs core pqsL 0.08, edge phz vs core pqsL 0.04, edge wt core pqsL .08
+summary(Safrequency5AovSR)# nope
+summary(Safrequency10AovSR)#yup
+TukeyHSD(Safrequency10AovSR)# core pqsL VS core wt 0.01, vs edge phz 0.03 edge pqsL 0.06, edge wt 0.03 
+summary(Safrequency100AovSR)
+
 #now compute comparison edge vs core
+##Pa
 PaPhz5E<-HistReplicateSummary%>% filter(Species=="P. aeruginosa",TimePoint=="Day 4",Strain == "phz", Culture == "co",LogBin == "(.5, 5]",Region == "edge")
 PaPhz5C<-HistReplicateSummary%>% filter(Species=="P. aeruginosa",TimePoint== "Day 4",Strain == "phz",Culture == "co",LogBin == "(.5, 5]",Region == "core")
 PaPhz10E<-HistReplicateSummary%>% filter(Species=="P. aeruginosa",TimePoint== "Day 4",Strain== "phz",Culture == "co",LogBin == "(5, 10]",Region == "edge")
@@ -544,7 +598,7 @@ PaPqsL5CorEdBioTtest     <-t.test(x = PaPqsL5E$NormalizedBiomass, y = PaPqsL5C$N
 PaPqsL5CorEdFreqTtest    <-t.test(x = PaPqsL5E$NormalizedFrequency, y = PaPqsL5C$NormalizedFrequency, paired = F)
 PaPqsL10CorEdFreqTtest   <-t.test(x = PaPqsL10E$NormalizedFrequency, y = PaPqsL10C$NormalizedFrequency, paired = F)
 PaPqsL100CorEdFreqTtest  <-t.test(x = PaPqsL100E$NormalizedFrequency, y = PaPqsL100C$NormalizedFrequency, paired = F)
-
+##Sa
 SaPhz5E<-HistReplicateSummary %>% filter(Species == "S. aureus" & TimePoint == "Day 4", Strain == "phz", Culture=="co",LogBin =="(.5, 5]",Region == "edge")
 SaPhz5C<-HistReplicateSummary %>% filter(Species == "S. aureus" & TimePoint == "Day 4", Strain == "phz", Culture=="co",LogBin =="(.5, 5]",Region == "core")                                        
 SaPqsL5E<-HistReplicateSummary %>% filter(Species == "S. aureus" & TimePoint == "Day 4", Strain == "pqsL", Culture == "co",LogBin == "(.5, 5]",Region == "edge")
@@ -571,7 +625,7 @@ tTestFigs2CDData<-list(PaPhz5CorEdBioTtest,PaPhz5CorEdFreqTtest,PaPhz10CorEdFreq
                        SaPhz5CorEdBioTtest,SaPhz5CorEdFreqTtest,SaPhz10CorEdFreqTtest,SaPhz100CorEdFreqTtest,
                        SaPqsL5CorEdBioTtest,SaPqsL5CorEdFreqTtest,SaPqsL10CorEdFreqTtest,SaPqsL100CorEdFreqTtest) 
 
-tTestFigs2CDTable<-bind_rows(map(tTestFigs2CDData, TtestTable))
+tTestFigs2CDTableCorevsEdge<-bind_rows(map(tTestFigs2CDData, TtestTable))
 
 ```
 
@@ -700,6 +754,10 @@ plankAggHistRep<-HistReplicate %>%
   summarize() %>%  unique()%>%ungroup() %>%  
   group_by(SampleCode,Species,SaStrain,Strain,Culture,TimePoint,Condition,Replicate,Region) %>% mutate(checkAggFreq =sum(AgPlNormFrequency), checkAggBiomass = sum(AgPlNormBiomass))
 
+plankAggHistRepStats<-plankAggHistRep %>%
+  group_by(Species,SaStrain,Strain,Culture,TimePoint,Condition,Aggregation)%>%
+  summarize(MeanFreq = mean(AgPlNormFrequency), MeanBiomass = mean(AgPlNormBiomass)) 
+
 ##Normalize using Condition 
 HistCondition<-HistCondition %>%  mutate(Aggregation = if_else(LogBin == "(.5, 5]", "Planktonic", "Aggregate")) %>%
   group_by(Species,Condition,TimePoint,Aggregation)%>% 
@@ -748,17 +806,17 @@ ggplot()+
         strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
         strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
 }
-PlotAggPlank<-function(rep.df,cond.df,region.df, y_var, title, colorStrain, facet){
+PlotAggPlank<-function(rep.df, y_var, title, colorStrain, facet){
 ggplot()+
     geom_point(data = rep.df %>% filter(TimePoint=="Day 4" & Aggregation == "Planktonic"),
                 aes(x=.data[[facet]],y=.data[[y_var]], color =.data[[colorStrain]], shape = Region),
                position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75),size=1)+
-    geom_point(data = region.df%>% filter(TimePoint=="Day 4"& Aggregation == "Planktonic"),
-               aes(x=.data[[facet]],y=.data[[y_var]], color =.data[[colorStrain]],shape = Region),
-               size=3, position = position_dodge(width = .75) )+
-    geom_point(data = cond.df%>% filter(TimePoint=="Day 4"& Aggregation == "Planktonic"),
-               aes(x=.data[[facet]],y=.data[[y_var]],  color =.data[[colorStrain]]),size=4, shape = 3,position = position_dodge(width = .75) )+
-    scale_y_log10(breaks = c(100, 10, 1, .1, .01), labels = c(100, 10, 1, .1, .01))+
+    #geom_point(data = region.df%>% filter(TimePoint=="Day 4"& Aggregation == "Planktonic"),
+    #           aes(x=.data[[facet]],y=.data[[y_var]], color =.data[[colorStrain]],shape = Region),
+    #           size=3, position = position_dodge(width = .75) )+
+    #geom_point(data = cond.df%>% filter(TimePoint=="Day 4"& Aggregation == "Planktonic"),
+    #           aes(x=.data[[facet]],y=.data[[y_var]],  color =.data[[colorStrain]]),size=4, shape = 3,position = position_dodge(width = .75) )+
+    #scale_y_log10(breaks = c(100, 10, 1, .1, .01), labels = c(100, 10, 1, .1, .01))+
     #facet_grid(.~.data[[facet]])+
     scale_shape_manual(values=c(16, 1))+
     ggtitle(title)+
@@ -778,9 +836,11 @@ ggplot()+
 ###---Figure 1D
 #this is the current version but the ones below mmight also work if I want to show Pa monos and not facetting the species
 PlotAggPlank(plankAggHistRep%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
-             plankAggHistCond%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
-             plankAggHistCondReg%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
+             #plankAggHistCond%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
+             #plankAggHistCondReg%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
              "AgPlNormBiomass", "Biomass from planktonic cells", "Culture","Species")
+
+test<-plankAggHistRep%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono") %>% filter(TimePoint=="Day 4" & Aggregation == "Planktonic")
 
 PlotAggPlank(plankAggHistRep%>% filter(Culture == "co"),
              plankAggHistCond%>% filter(Culture == "co"),
