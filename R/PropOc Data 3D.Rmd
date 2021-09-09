@@ -574,10 +574,11 @@ metaData.df <-read.csv('/Volumes/raw_data/Confocal/Carolyn/2020/Chronic wounds/i
 metaData.df$SampleCode<-as.factor(metaData.df$SampleCode)
 metaData.df<-metaData.df %>% select(SampleCode, mouse, Position, size, Region, Zdim, xyDim,xySize)#
 propOcMidDensMetaLabel<-metaData.df %>%  merge(propOcMidDensitylabeled, by = "SampleCode")
-
-#include Region
+#####
+#Calculate Stats
+##include Region
 propOcMidDensityStatsRegion<-propOcMidDensMetaLabel %>% ungroup() %>% group_by(Condition,Culture,Strain,TimePoint,Region, Distance, Relation) %>% summarize(meanValue = mean(Value), sdValue = std.error(Value), medianValue = median(Value))
-#exclude region
+##exclude region
 propOcMidDensityStats<-propOcMidDensMetaLabel %>% ungroup() %>% group_by(Condition,Culture,Strain,TimePoint,Distance, Relation) %>% summarize(meanValue = mean(Value), sdValue = std.error(Value), medianValue = median(Value))
 
 PlotMeanMidDensityPORegion<-function(relation){
@@ -642,6 +643,7 @@ PlotMeanMidDensityPOCenterRegion<-function(){
     theme(plot.title = element_text(hjust = 0.5))
 }
 PlotMeanMidDensityPOCenterRegion()
+#####
 #Calculate empty space
 
 emptySpaceRgn<-propOcMidDensityStatsRegion %>% mutate(Focus = recode(Relation, "Pa->Sa" = "Pa","Pa->Pa" = "Pa","Sa->Sa" = "Sa","Sa->Pa" = "Sa")) %>% group_by(Focus, Distance, Condition, TimePoint, Region) %>% mutate(EmptySpace = 1-(sum(meanValue)), SDEmptySpace = sum(sdValue))
@@ -676,7 +678,7 @@ PlotEmptySpaceRegion<-function(focus){
 PlotEmptySpaceRegion("Pa")
 PlotEmptySpaceRegion("Sa")
 
-
+#####
 #Calculate Enrichment
 propOcEnrichment<- propOcMidDensitylabeled %>% group_by(SampleCode,Relation)%>%
   select(Value, Density, Distance, Relation,Sample, Strain,TimePoint, Condition, Culture, Strain,SampleCode) %>% mutate(Enrichment = max(Value)) %>%
@@ -711,7 +713,28 @@ PlotEnrichment("Sa->Sa")
 PlotEnrichment("Pa->Pa")
 
 #It's unclear how to deal with the issue of multiple enrichment distances, but I think doing a weighted mean makes the most sense:
+#THIS is the one used for stats
 pOEnrMetaClean<-pOEnrMeta %>% group_by(SampleCode,Condition,TimePoint, Region, Relation)%>%summarise(WmeanDist =weighted.mean(Distance, Density))
+pOEnrMetaClean$CondRegion <- paste0(pOEnrMetaClean$Condition, "-",pOEnrMetaClean$Region)
+#####
+#Stats
+PaSaEnDi.Aov <- aov(WmeanDist ~ Condition, data = pOEnrMetaClean%>%
+                     filter(Relation == "Pa->Sa",TimePoint == "Day 4"))
+SaPaEnDi.Aov <- aov(WmeanDist ~ Condition, data = pOEnrMetaClean%>%
+                       filter(Relation == "Sa->Pa",TimePoint == "Day 4"))
+
+PaSaEnDiRgn.Aov <- aov(WmeanDist ~ CondRegion, data = pOEnrMetaClean%>%
+                       filter(Relation == "Pa->Sa",TimePoint == "Day 4"))
+SapaEnDiRgn.Aov <- aov(WmeanDist ~ CondRegion, data = pOEnrMetaClean%>%
+                       filter(Relation == "Sa->Pa",TimePoint == "Day 4"))
+# Summary of the analysis #only showing significant values
+summary(PaSaEnDi.Aov)#*p = 0.03
+TukeyHSD(PaSaEnDi.Aov)#p wt~pqsL = 0.03
+summary(SaPaEnDi.Aov)#nope
+summary(PaSaEnDiRgn.Aov)#*p = 0.08
+TukeyHSD(PaSaEnDiRgn.Aov)#p wt-edge~pqsL-core = 0.04
+summary(SapaEnDiRgn.Aov)#nope!
+
 #now calculate the Mean per condition:
 pOEnrMetaStatsRegion<-pOEnrMetaClean %>% group_by(Condition,TimePoint, Region, Relation) %>%
   summarise(meanED = mean(WmeanDist),medianED = median(WmeanDist), SDED = sd(WmeanDist), SEED = std.error(WmeanDist),per25 = quantile(WmeanDist, .25), per75 = quantile(WmeanDist, .75))
@@ -780,8 +803,9 @@ PlotMeanEnrichment50percentNRegion(pOEnrMetaStats %>% filter(TimePoint == "Day 4
                             pOEnrMetaClean %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"))
 PlotMedianEnrichment50percentNRegion(pOEnrMetaStats %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"),
                             pOEnrMetaClean %>% filter(TimePoint == "Day 4", Relation == "Pa->Sa", TimePoint == "Day 4"))
-
-#original figure 
+#####
+#original figures
+##no region
 ggplot()+
     geom_pointrange(data = pOEnrMetaStats,aes(y=meanED,ymax=meanED+SEED,ymin=meanED-SEED, x = Condition),position = position_dodge(width = .5))+
   geom_jitter(data = pOEnrMetaClean,aes(y=WmeanDist,x = Condition),size=1, shape = 1, height = 0, width = .2)+
@@ -792,7 +816,7 @@ ggplot()+
           strip.text = element_text(size = 12, margin = margin(.1,0,.1,0, "cm")),#this is for the facets
           strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"))+
     panel_border() 
-
+##include Region
 ggplot()+
     geom_pointrange(data = pOEnrMetaStatsRegion,aes(y=meanED,ymax=meanED+SEED,ymin=meanED-SEED, shape = Region,x = Condition),
                     position = position_dodge(width = .5))+
