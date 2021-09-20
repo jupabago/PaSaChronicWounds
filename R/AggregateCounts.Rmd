@@ -668,6 +668,36 @@ PlotHistSum(HistReplicateSummary%>% filter(Culture =="co"),
             "NormalizedFrequency", "Normalized Frequency per size bin", "Strain")
 #To Show the mono for Pa, one way to do it is to include the species in the filtering and do one plot per species. I dont thnink it's reasonable to do it all in one plot
 
+PlotHistSumCols<- function(df, df2, fill){
+ggplot()+
+  geom_col(data = df,aes(x=as.factor(LogBin),y=NormalizedFrequency, fill = .data[[fill]]),
+           size=3,position = position_dodge( width = .9))+
+  geom_point(data = df2,
+                aes(x=as.factor(LogBin),y=NormalizedFrequency, fill = .data[[fill]]),
+               position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75),size=1, shape = 1,show.legend = FALSE)+
+  scale_y_continuous(limits = c(0,103),expand = expand_scale(mult = c(0, 0)))+
+  facet_grid(.~Species)+
+  scale_fill_grey()+
+  labs(y = paste("Frequency (%)"),x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
+        strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
+        axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(margin = margin(1,0,0,0),size=13),
+        axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,2,0),size=11))
+}
+
+PlotHistSumCols(HistCondRegionSum%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono") %>% filter(TimePoint=="Day 4"),
+                  HistReplicateSummary%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono") %>%  
+                    filter(TimePoint=="Day 4"), "Culture")#for mono vs co
+PlotHistSumCols(HistCondRegionSum%>% filter(Culture == "co") %>% filter(TimePoint=="Day 4"),
+                  HistReplicateSummary%>% filter(Culture == "co")%>%  filter(TimePoint=="Day 4"), "Strain")#for mono vs co
+
+
+
+
+
+
+
 #Plot normalized Biomass per sample
 ##Pa
 PlotHistRepBioTrend<-function(rep.df,species){
@@ -846,6 +876,33 @@ PlotAggPlank(plankAggHistRep%>% filter(Culture == "co"),
              plankAggHistCond%>% filter(Culture == "co"),
              plankAggHistCondReg%>% filter(Culture == "co"),
              "AgPlNormBiomass", "Biomass from planktonic cells", "Strain","Species")
+
+
+#this is for the defense presentation
+PlotAggsPlankcols<- function(df, df2, fill){
+ggplot()+
+  geom_col(data = df,aes(x=Aggregation,y=AgPlNormBiomass, fill = .data[[fill]]),
+           size=3,position = position_dodge( width = .9))+
+  geom_point(data = df2,
+                aes(x=Aggregation,y=AgPlNormBiomass, fill = .data[[fill]]),
+               position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75),size=1, shape = 1,show.legend = FALSE)+
+  scale_y_continuous(limits = c(0,103),expand = expand_scale(mult = c(0, 0)))+
+  facet_grid(.~Species)+
+  scale_fill_grey()+
+  labs(title = '', x = "", y = "Biomass contribution (%)")+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
+        strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
+        axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(margin = margin(1,0,0,0),size=13),
+        axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,2,0),size=11))
+}
+
+PlotAggsPlankcols(plankAggHistCondReg%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono") %>% filter(TimePoint=="Day 4"),
+                  plankAggHistRep%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono") %>%  
+                    filter(TimePoint=="Day 4"), "Culture")#for mono vs co
+PlotAggsPlankcols(plankAggHistCondReg%>% filter(Culture == "co") %>% filter(TimePoint=="Day 4"),
+                  plankAggHistRep%>% filter(Culture == "co")%>%  filter(TimePoint=="Day 4"), "Strain")#for mono vs co
+
 
 
 #these are the other versions
