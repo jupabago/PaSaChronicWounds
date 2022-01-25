@@ -1,0 +1,314 @@
+---
+title: "SaPaFigures"
+author: "Juan P Barraza"
+date: "1/14/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+library(pixmap)
+library(rtiff)
+library(reshape2)
+library(gplots)
+library(gdata)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(cowplot)
+library(tidyr)
+library(purrr)
+library(plotrix)
+library(ggsignif)
+library(rdist)
+library(stringr)
+
+```
+
+```{r figure 1}
+#CFU data from Carolyn
+CFUdata<-read.csv("/Users/jupabago/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/CFU_wound_All_dataTidy.csv",header = TRUE)
+CFUdata$Condition<-as.factor(CFUdata$Condition)
+   CFUdata$Day<-as.factor(CFUdata$Day)
+   CFUdata$Species<-as.factor(CFUdata$Species)
+   CFUdata$Strain<-as.factor(CFUdata$Strain)
+CFUdata$Condition <- factor(CFUdata$Condition, levels = c("mono", "co-wt", "co-pqsL"))
+CFUstats<-CFUdata%>%group_by(Species,Condition,Strain,Day) %>% mutate(MeanCFU = mean(CFU), SECFU = std.error(CFU))
+CFUstats$Condition <- factor(CFUstats$Condition, levels = c("mono", "co-wt", "co-pqsL"))
+PlotCFUs<- function(){
+ggplot()+
+  geom_col(data = CFUstats %>% filter(Day == "4", Condition %in% c("mono", "co-wt"), Strain == "wt"),aes(x=Species,y=MeanCFU, fill = Condition),
+           size=3,position = position_dodge( width = .9))+
+  
+  geom_errorbar(data = CFUstats %>% filter(Day == "4", Condition %in% c("mono", "co-wt"), Strain == "wt"),
+                aes(x=Species,ymin=(MeanCFU-SECFU), ymax = (MeanCFU+SECFU), group = Condition),width = 0, size=.5,position = position_dodge(width = .9))+
+  
+    scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)),expand = expand_scale(mult = c(0, 0)))+
+  #facet_grid(.~Species)+
+  scale_fill_grey(labels = c("Mono-culture","Co-culture"))+
+  #labs(x = "", y = expression(paste(Log[10], " CFU")), linetype = "")+
+    labs(x = "", y = "CFU per wound")+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
+        strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
+        axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(face = "italic",margin = margin(1,0,0,0),size=13),
+        axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,2,0),size=11))
+}
+figure1A<-PlotCFUs()
+figure1A
+
+CFUdataWT<-CFUdata %>% filter(Day == "4", Condition %in% c("mono", "co-wt"), Strain == "wt")
+
+PlotCFUs2<- function(){
+  ggplot()+
+    geom_jitter(data = CFUdata %>% filter(Day == "4", Condition %in% c("mono", "co-wt"), Strain == "wt"),
+                aes(x=Species,y=CFU, color = Condition),size=3,position = position_jitterdodge(jitter.height = 0,jitter.width = 0.6, dodge.width = .9))+
+    geom_errorbar(data = CFUstats %>% filter(Day == "4", Condition %in% c("mono", "co-wt"), Strain == "wt"),
+                aes(x=Species,ymin=(MeanCFU), ymax = (MeanCFU), group = Condition),width = .4,position = position_dodge(width = .9))+
+    scale_color_grey(labels = c("Mono-culture","Co-culture"))+
+    scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)),expand = expand_scale(mult = c(0, 0)), limits = c(1,10^11))+
+  #labs(x = "", y = expression(paste(Log[10], " CFU")), linetype = "")+
+    labs(x = "", y = "CFU per wound")+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
+        strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
+        axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(face = "italic",margin = margin(1,0,0,0),size=13),
+        axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,2,0),size=11))
+}  
+figure1A2<-PlotCFUs2()
+figure1A2
+
+
+
+#I am taking this code from Aggregate counts.RMD, but the biomass is lower case on the df that I have
+BiomassData<-aggregateList%>% group_by(SampleCode,Species,SaStrain,Strain,Culture,TimePoint,Condition,Replicate,Region) %>% 
+  summarise(Aggs = n(), Biomass = sum(Size), MeanAggSize = mean(Size), SEAggSize = std.error(Size), MaxSize = max(Size), MinSize = min(Size)) %>%
+  ungroup() %>% mutate(RatioMaxTotal = MaxSize/Biomass) 
+
+BiomassDataStats<-BiomassData %>% 
+  group_by(Species,SaStrain,Strain,Culture,TimePoint,Condition) %>% 
+  summarise(MeanAggs= mean(Aggs),MeanBiomass = mean(Biomass), SEBiomass = std.error(Biomass), MeanBiomassLog = mean(log10(Biomass)), SEBiomassLog = std.error((log10(Biomass))), MeanMeanAggSize = mean(MeanAggSize), SEMeanAggSize = std.error(MeanAggSize))
+
+biomassWTData = BiomassDataStats%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono") %>% filter(TimePoint == "Day 4" )
+
+PlotBiomass<- function(){
+  ggplot()+
+    geom_col(data = biomassWTData,aes(x=Species,y=MeanBiomass, fill = Culture),
+             size=3,position = position_dodge( width = .9))+
+    geom_errorbar(data = biomassWTData, aes(x=Species,ymin=(MeanBiomass-SEBiomass), ymax = (MeanBiomass+SEBiomass), group = Culture)
+                ,width = 0, size=.5,position = position_dodge(width = .9))+
+    scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)),expand = expand_scale(mult = c(0, 0)))+
+    scale_fill_grey(labels = c("Mono-culture","Co-culture"))+
+    labs(x = "",y = bquote(paste("Biomass per wound (", mu*"m"^3*")")))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
+          axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(face = "italic",margin = margin(1,0,0,0),size=13),
+          axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,2,0),size=11))
+}
+
+figure1B<-PlotBiomass()
+figure1B
+
+```
+#####
+
+```{r figure 2 Core vs Edge}
+
+#Figure 2A: Percent CFU inner wound
+##### 
+CFUInOutData<-read.csv("/Users/jupabago/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/Inside_Outside_CFUcm2_Day4Tidy.csv",header = TRUE)
+CFUInOutData<-Filter(function(x)!all(is.na(x)), CFUInOutData)#this is to remove columns with NA
+CFUInOutData <- na.omit(CFUInOutData) #removing rows with NA
+CFUInOutData$Condition<-as.factor(CFUInOutData$Condition)
+CFUInOutData$Sample<-as.factor(CFUInOutData$Sample)
+CFUInOutData$Species<-as.factor(CFUInOutData$Species)
+CFUInOutData$Strain<-as.factor(CFUInOutData$Strain)
+
+CFUInOutDataPost<-CFUInOutData %>% mutate(CFU.Inside = Inside.Bandage+Inside.Tissue, CFU.Outside = Outside.Tissue+Outside.Bandage) %>% mutate(PercentIn = 100*CFU.Outside/(CFU.Inside+CFU.Outside))
+
+CFUInOutStats<-CFUInOutDataPost%>% group_by(Species,Strain,Condition) %>% summarise(meanInPercent = mean(PercentIn), SEInPercent = std.error(PercentIn))
+CFUInOutStatsWt<-CFUInOutStats %>% filter(!Condition=="co-pqsL") %>% filter(Strain == "wt")
+CFUInOutStatsWt$Condition <- factor(CFUInOutStatsWt$Condition, levels = c("mono", "co-wt"))
+
+PlotInCFUs<- function(){
+  ggplot()+
+    geom_col(data = CFUInOutStatsWt,aes(x=Species,y=meanInPercent, fill = Condition),size=3,position = position_dodge( width = .9))+
+    geom_errorbar(data = CFUInOutStatsWt,aes(x=Species,ymin=(meanInPercent-SEInPercent), ymax = (meanInPercent+SEInPercent), group = Condition),width = 0, size=.5,position = position_dodge(width = .9))+
+    scale_fill_grey(labels = c("Mono-culture","Co-culture"))+
+    scale_y_continuous(expand = expand_scale(mult = c(0, 0)))+
+  #labs(x = "", y = expression(paste(Log[10], " CFU")), linetype = "")+
+    labs(x = "",y = bquote(paste("% CFU/", "cm"^2*" in healing edge")))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
+        strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
+        axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(face = "italic",margin = margin(1,0,0,0),size=13),
+        axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,2,0),size=11))
+  }
+figure2A<-PlotInCFUs()
+figure2A
+
+#now with geom_point
+CFUInOutPostWt<-CFUInOutDataPost %>% filter(!Condition=="co-pqsL") %>% filter(Strain == "wt")
+CFUInOutPostWt$Condition <- factor(CFUInOutPostWt$Condition, levels = c("mono", "co-wt"))
+
+PlotInCFUs2<- function(){
+  ggplot()+
+    geom_jitter(data = CFUInOutPostWt,aes(x=Species,y=PercentIn, color = Condition),size=3,position = position_jitterdodge(jitter.height = 0,jitter.width = 0.2, dodge.width = .9))+
+    geom_errorbar(data = CFUInOutStatsWt,aes(x=Species,ymin=(meanInPercent), ymax = (meanInPercent), group = Condition),width = .4, size=.5,position = position_dodge(width = .9))+
+    scale_color_grey(labels = c("Mono-culture","Co-culture"))+
+    scale_y_continuous(expand = expand_scale(mult = c(0, 0)), limits = c(0,75))+
+  #labs(x = "", y = expression(paste(Log[10], " CFU")), linetype = "")+
+    labs(x = "",y = bquote(paste("% CFU/", "cm"^2*" in healing edge")))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
+        strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
+        axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(face = "italic",margin = margin(1,0,0,0),size=13),
+        axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,2,0),size=11))
+}  
+figure2A2<-PlotInCFUs2()
+figure2A2
+#####
+
+
+#Figure 2B
+#Aggregation inner vs outer region
+#####
+PlotAggCore<-function(rep.df,region.df, y_var, title,colorStrain, facet){
+ggplot()+
+    geom_point(data = rep.df %>% filter(TimePoint=="Day 4"),
+                aes(x=Region,y=.data[[y_var]], color =.data[[colorStrain]]),
+               position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75),size=3)+
+    geom_errorbar(data = region.df%>% filter(TimePoint=="Day 4"),
+               aes(x=Region,ymin=.data[[y_var]],ymax=.data[[y_var]], group =.data[[colorStrain]]),
+               size=.5,width = 0.5, position = position_dodge(width = .75) )+
+    #geom_point(data = cond.df%>% filter(TimePoint=="Day 4"),
+     #          aes(x=Region,y=.data[[y_var]],  color =.data[[colorStrain]]),size=4, shape = 3,position = position_dodge(width = .75) )+
+    scale_y_log10(breaks = c(100, 10, 1, .1, .01), labels = c(100, 10, 1, .1, .01))+
+    facet_grid(.~.data[[facet]])+
+    scale_shape_manual(values=c(16, 1))+
+    scale_color_grey(labels = c("Mono-culture","Co-culture"))+
+    ggtitle(title)+
+    labs(y = paste("Planktonic Biomass Contribution (%)"))+
+    theme_cowplot()+
+    panel_border() +
+    theme(plot.title = element_text(hjust = 0.5), 
+        strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
+        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
+}
+
+PlotAggCore(plankAggHistRep%>% filter(Strain %in% c("Sa", "wt")) %>% filter(Aggregation=="Planktonic"),
+             plankAggHistCondReg%>% filter(Strain %in% c("Sa", "wt"))%>% filter(Aggregation=="Planktonic"),
+             "AgPlNormBiomass", "", "Culture", "Species")
+
+```
+
+```{r Figure 4}
+#Antibiotic data
+ReadAbData<-function(){
+df<-read.csv("/Users/jupabago/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/AntibioticTreatment_percentofuntreatedTidy.csv",header = TRUE)
+df<-Filter(function(x)!all(is.na(x)), df)#this is to remove columns with NA
+df <- na.omit(df) #removing rows with NA
+df$Condition<-as.factor(df$Condition)
+df$Sample<-as.factor(df$Sample)
+df$Species<-as.factor(df$Species)
+df$Treatment<-as.factor(df$Treatment)
+df$Structure<-as.factor(df$Structure)
+return(df)
+}
+AbData<-ReadAbData()
+AbData$Condition <- factor(AbData$Condition, levels = c("mono", "co-wt", "co-pqsL"))
+AbData<-AbData %>% group_by(Structure, Species, Condition, Sample) %>%  mutate(SurvivalFinal = mean(Survival)) %>% filter(!Treatment=="Treated1")
+AbData<-AbData %>% mutate(SurvivalRatio = SurvivalFinal/100)
+AbDataStats<-AbData %>% group_by(Species, Structure,Condition) %>% summarise(MeanSurvival = mean(SurvivalFinal), SESurvival = std.error(SurvivalFinal), 
+                                                                             MeanSurRatio = mean(SurvivalRatio), SESurRatio = std.error(SurvivalRatio)) %>% ungroup()
+
+
+PlotAbData<-function(df,xaxis,yaxis, error, fill){
+ggplot()+
+  geom_col(data = df%>% filter(Species == "S. aureus"),aes(x=.data[[xaxis]],y=.data[[yaxis]], fill = .data[[fill]]),size=3,position = position_dodge( width = .9))+
+  geom_errorbar(data = df%>% filter(Species == "S. aureus"),aes(x=.data[[xaxis]],ymin=(.data[[yaxis]]-.data[[error]]), ymax = (.data[[yaxis]]+.data[[error]]), group = .data[[fill]]),
+                width = 0, size=.5,position = position_dodge(width = .9))+
+  scale_y_continuous(expand = expand_scale(mult = c(0, 0)))+
+  #scale_y_log10(limits = c(.0001,100))+
+  #facet_grid(.~Species)+
+  scale_fill_grey(labels = c("Mono-culture","Co-culture wt", "Co-culture pqsL"))+
+  #labs(x = "", y = expression(paste(Log[10], " CFU")), linetype = "")+
+  labs(x = "", y = expression(paste(italic(S.aureus )," % Survival" )))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
+        strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
+        axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(face = "italic",margin = margin(1,0,0,0),size=13),
+        axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,2,0),size=11))
+}
+PlotAbData(AbDataStats,"Structure","MeanSurvival","SESurvival", "Condition")
+
+PlotAbData2<-function(){
+ggplot()+
+  geom_jitter(data = AbData %>% filter(Species == "S. aureus"),aes(x=Structure,y=SurvivalRatio, shape = Sample, color = Condition, group = Condition),size=3,
+              position = position_jitterdodge(jitter.height = 0,jitter.width = 0.2, dodge.width = .9))+
+  geom_errorbar(data = AbDataStats %>% filter(Species == "S. aureus"),aes(x=Structure,ymin=(MeanSurRatio), ymax = (MeanSurRatio), group = Condition),
+                width = .5, size=.5,position = position_dodge(width = .9))+
+  #facet_grid(.~Species)+
+  scale_color_grey(labels = c("Mono-culture","Co-culture wt", "Co-culture pqsL"))+
+  #labs(x = "", y = expression(paste(Log[10], " CFU")), linetype = "")+
+    #scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)))+
+  labs(x = "", y = expression(paste(italic(S.aureus )," Survival fraction" )))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
+        strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
+        axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(margin = margin(1,0,0,0),size=13),
+        axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,2,0),size=11))
+}
+PlotAbData2()
+
+#This doesn't really gets the point across, so get the ratio of survival in treated vs untreated
+AbData<-AbData %>% ungroup() %>% group_by(Sample, Species, Condition) %>% mutate(SurvivalRatioStructure = SurvivalRatio/SurvivalRatio[Structure=="Unstructured"],SurvivalDifferenceStructure = SurvivalFinal[Structure=="Unstructured"]-SurvivalFinal )
+#now we redo AbDataStats:
+AbDataUnstructureStats<-AbData %>% filter(Structure == "Structured") %>% group_by(Species, Condition) %>%
+  summarise(MeanRatio = mean(SurvivalRatioStructure), SESurvival = std.error(SurvivalRatioStructure),
+            MeanDifference = mean(SurvivalDifferenceStructure), SEDifference = std.error(SurvivalDifferenceStructure))%>% ungroup()
+
+PlotAbData3<-function(df,xaxis,yaxis, error, fill){
+ggplot()+
+  geom_col(data = df %>% filter(Species == "S. aureus"),aes(x=.data[[xaxis]],y=.data[[yaxis]], fill = .data[[fill]]),size=3,position = position_dodge( width = .9))+
+  geom_errorbar(data = df%>% filter(Species == "S. aureus"),aes(x=.data[[xaxis]],ymin=(.data[[yaxis]]-.data[[error]]), ymax = (.data[[yaxis]]+.data[[error]]), group = .data[[fill]]),
+                width = 0, size=.5,position = position_dodge(width = .9))+
+  scale_y_continuous(expand = expand_scale(mult = c(0, 0)))+
+  #scale_y_log10(expand = expand_scale(mult = c(0, 0)))+
+  #facet_grid(.~Species)+
+  scale_fill_grey(labels = c("Mono-culture","Co-culture wt", "Co-culture pqsL"))+
+  #labs(x = "", y = expression(paste(Log[10], " CFU")), linetype = "")+
+  labs(x = "", y = "Survival fraction Structured/Unstructured")+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
+        strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
+        axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(face = "italic",margin = margin(1,0,0,0),size=13),
+        axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,2,0),size=11))
+}
+PlotAbData3(AbDataUnstructureStats,"Species","MeanRatio","SESurvival", "Condition")
+PlotAbData3(AbDataUnstructureStats,"Species","MeanDifference","SEDifference", "Condition")
+#now using the jittel points
+
+PlotAbData4<-function(){
+ggplot()+
+  geom_jitter(data = AbData %>% filter(Species == "S. aureus") %>% filter(Structure == "Structured") ,
+              aes(x=Species,y=SurvivalRatioStructure, color = Condition, group = Condition, shape = Sample),size=3,
+              position = position_jitterdodge(jitter.height = 0,jitter.width = 0.2, dodge.width = .9))+
+  geom_errorbar(data = AbDataUnstructureStats %>% filter(Species == "S. aureus"),
+                aes(x=Species,ymin=(MeanRatio), ymax = (MeanRatio), group = Condition),
+                width = .5, size=.5,position = position_dodge(width = .9))+
+  #facet_grid(.~Species)+
+  scale_color_grey(labels = c("Mono-culture","Co-culture wt", "Co-culture pqsL"))+
+  labs(x = "", y = expression(paste(italic(S.aureus )," survival fraction Structured/Unstructured" )))+
+    scale_y_log10(breaks = c(1,10,100,1000), labels = c(1,10,100,1000), limits = c(1, 10000))+
+  theme_cowplot()+
+  theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
+        strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
+        axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(margin = margin(1,0,0,0),size=13),
+        axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,2,0),size=11))
+}
+PlotAbData4()
+
+```
