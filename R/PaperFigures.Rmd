@@ -9,7 +9,6 @@ editor_options:
 
 ```{r setup, include=FALSE}
 library(pixmap)
-library(rtiff)
 library(reshape2)
 library(gplots)
 library(gdata)
@@ -27,6 +26,8 @@ library(stringr)
 ```
 
 ```{r figure 1}
+#Figure 1A CFU data wt
+#####
 #CFU data from Carolyn
 CFUdata<-read.csv("/Users/jupabago/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/CFU_wound_All_dataTidy.csv",header = TRUE)
 CFUdata$Condition<-as.factor(CFUdata$Condition)
@@ -79,8 +80,10 @@ PlotCFUs2<- function(){
 figure1A2<-PlotCFUs2()
 figure1A2
 
+#####
 
-
+#Figure 1B
+#####
 #I am taking this code from Aggregate counts.RMD, but the biomass is lower case on the df that I have
 BiomassData<-aggregateList%>% group_by(SampleCode,Species,SaStrain,Strain,Culture,TimePoint,Condition,Replicate,Region) %>% 
   summarise(Aggs = n(), Biomass = sum(Size), MeanAggSize = mean(Size), SEAggSize = std.error(Size), MaxSize = max(Size), MinSize = min(Size)) %>%
@@ -90,7 +93,10 @@ BiomassDataStats<-BiomassData %>%
   group_by(Species,SaStrain,Strain,Culture,TimePoint,Condition) %>% 
   summarise(MeanAggs= mean(Aggs),MeanBiomass = mean(Biomass), SEBiomass = std.error(Biomass), MeanBiomassLog = mean(log10(Biomass)), SEBiomassLog = std.error((log10(Biomass))), MeanMeanAggSize = mean(MeanAggSize), SEMeanAggSize = std.error(MeanAggSize))
 
+BiomassDataWt = BiomassData%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono") %>% filter(TimePoint == "Day 4" )
 biomassWTData = BiomassDataStats%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono") %>% filter(TimePoint == "Day 4" )
+#Carolyn wanted to play with the data so here it is:
+write.csv(BiomassDataWt,"/Users/jupabago/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/CSV exports/BiomassWT.csv", row.names = T)
 
 PlotBiomass<- function(){
   ggplot()+
@@ -100,7 +106,7 @@ PlotBiomass<- function(){
                 ,width = 0, size=.5,position = position_dodge(width = .9))+
     scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)),expand = expand_scale(mult = c(0, 0)))+
     scale_fill_grey(labels = c("Mono-culture","Co-culture"))+
-    labs(x = "",y = bquote(paste("Biomass per wound (", mu*"m"^3*")")))+
+    labs(x = "",y = bquote(paste("Biomass per image (", mu*"m"^3*")")))+
     theme_cowplot()+
     theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
           strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
@@ -110,6 +116,24 @@ PlotBiomass<- function(){
 
 figure1B<-PlotBiomass()
 figure1B
+
+PlotBiomassPoints<- function(){
+  ggplot()+
+    geom_jitter(data = BiomassDataWt,aes(x=Species,y=Biomass, color = Culture),size=3,position = position_jitterdodge(jitter.height = 0,jitter.width = 0.2, dodge.width = .9))+
+    geom_errorbar(data = biomassWTData, aes(x=Species,ymin=(MeanBiomass), ymax = (MeanBiomass), group = Culture)
+                ,width = .4, size=.5,position = position_dodge(width = .9))+
+    scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)),
+                  limits = c(100, 10e7), expand = expand_scale(mult = c(0, 0)))+
+    scale_color_grey(labels = c("Mono-culture","Co-culture"))+
+    labs(x = "",y = bquote(paste("Biomass per image (", mu*"m"^3*")")))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
+          axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(face = "italic",margin = margin(1,0,0,0),size=13),
+          axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,2,0),size=11))
+}
+PlotBiomassPoints()
+#####
 
 ```
 #####
@@ -169,10 +193,72 @@ PlotInCFUs2<- function(){
 }  
 figure2A2<-PlotInCFUs2()
 figure2A2
+
+#With the mutants
+
 #####
-
-
 #Figure 2B
+#####
+#this is taken from AggregateCounts.Rmd section Plot Aggregagte size bins
+
+PlotHistSumFinal<-function(rep.df,cond.df,region.df, y_var, colorStrain){
+ggplot()+
+    geom_point(data = rep.df %>% filter(TimePoint=="Day 4"),
+                aes(x=as.factor(LogBin),y=.data[[y_var]], color =.data[[colorStrain]], shape = Region),
+               position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75),size=1)+
+    geom_point(data = region.df%>% filter(TimePoint=="Day 4"),
+               aes(x=as.factor(LogBin),y=.data[[y_var]], color =.data[[colorStrain]],shape = Region),
+               size=3, position = position_dodge(width = .75) )+
+    geom_errorbar(data = cond.df%>% filter(TimePoint=="Day 4"),
+               aes(x=as.factor(LogBin),ymin=.data[[y_var]],ymax=.data[[y_var]], group =.data[[colorStrain]]),width = .5,position = position_dodge(width = .75) )+
+    facet_grid(.~Species)+
+    scale_shape_manual(values=c(16, 1))+
+    scale_color_grey(labels = c("Mono-culture","Co-culture"))+
+    scale_x_discrete(labels = c("Planktonic", "5-10", "10-100", "100-1000", ">1000"))+
+    labs(y = paste("Frequency (%)"),x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    theme_cowplot()+
+    panel_border() +
+    theme(plot.title = element_text(hjust = 0.5), 
+        strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
+        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
+}
+
+PlotHistSumFinal(HistReplicateSummary%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
+            HistConditionSummary%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
+            HistCondRegionSum%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
+            "NormalizedFrequency", "Culture")
+
+#only difference between these two should be "scale_color_grey"
+PlotHistSumFinalStrains<-function(rep.df,cond.df,region.df, y_var, colorStrain){
+ggplot()+
+    geom_point(data = rep.df %>% filter(TimePoint=="Day 4"),
+                aes(x=as.factor(LogBin),y=.data[[y_var]], color =.data[[colorStrain]], shape = Region),
+               position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 1),size=2)+
+    geom_point(data = region.df%>% filter(TimePoint=="Day 4"),
+               aes(x=as.factor(LogBin),y=.data[[y_var]], color =.data[[colorStrain]],shape = Region),
+               size=5, position = position_dodge(width = 1) )+
+    geom_errorbar(data = cond.df%>% filter(TimePoint=="Day 4"),
+               aes(x=as.factor(LogBin),ymin=.data[[y_var]],ymax=.data[[y_var]], group =.data[[colorStrain]]),width = .8,position = position_dodge(width = 1) )+
+    facet_grid(.~Species)+
+    scale_shape_manual(values=c(16, 1))+
+    scale_color_grey(labels = c(bquote(paste(italic('S. aureus + P. aeruginosa '))),
+                                bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"pqsL"))), 
+                                bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"phz")))))+
+    scale_x_discrete(labels = c("Planktonic", "5-10", "10-100", "100-1000", ">1000"))+
+    labs(y = paste("Frequency (%)"),x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")), color = "Condition")+
+    theme_cowplot()+
+    panel_border() +
+    theme(plot.title = element_text(hjust = 0.5), 
+        strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
+        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
+}#only difference between these two should be "scale_color_grey
+PlotHistSumFinalStrains(HistReplicateSummary%>% filter(Culture =="co"),
+            HistConditionSummary%>% filter(Culture =="co"),
+            HistCondRegionSum%>% filter(Culture =="co"),
+            "NormalizedFrequency","Strain")
+
+#####
+#Figure 2C
 #Aggregation inner vs outer region
 #####
 PlotAggCore<-function(rep.df,region.df, y_var, title,colorStrain, facet){
@@ -190,7 +276,7 @@ ggplot()+
     scale_shape_manual(values=c(16, 1))+
     scale_color_grey(labels = c("Mono-culture","Co-culture"))+
     ggtitle(title)+
-    labs(y = paste("Planktonic Biomass Contribution (%)"))+
+    labs(y = paste("Planktonic Biomass Contribution (%)"), x = "")+
     theme_cowplot()+
     panel_border() +
     theme(plot.title = element_text(hjust = 0.5), 
@@ -201,6 +287,47 @@ ggplot()+
 PlotAggCore(plankAggHistRep%>% filter(Strain %in% c("Sa", "wt")) %>% filter(Aggregation=="Planktonic"),
              plankAggHistCondReg%>% filter(Strain %in% c("Sa", "wt"))%>% filter(Aggregation=="Planktonic"),
              "AgPlNormBiomass", "", "Culture", "Species")
+
+#Figure 2D
+##Marvin suggested doing the enrichment distance for those samples, but I guess there is nothing to compare, unless I do core vs edge
+##ggplot code from PropOc Data 3D
+PlotwtED<-function(){
+df1<-pOEnrMetaStatsRegion %>% filter(Relation == "Pa->Sa", TimePoint=="Day 4", Condition == "wt co")
+df2<-pOEnrMetaClean %>% filter(Relation == "Pa->Sa", TimePoint=="Day 4", Condition == "wt co")
+  ggplot()+
+    geom_errorbar(data = df1,aes(y=meanED,ymax=meanED,ymin=meanED, group = Region,x = Condition),
+                    position = position_dodge(width = .75), width = 0.5)+
+    geom_point(data = df2,aes(y=WmeanDist,x = Condition, shape = Region),position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75),size=3)+
+    labs(y = expression("Enrichment distance ("*mu*"m)"), x = "") +
+    scale_color_grey()+
+    scale_x_discrete(labels = c(""))+
+    scale_shape_manual(values=c(16, 1))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5),
+          strip.text = element_text(size = 12,margin = margin(.1,0,.1,0, "cm")),#this is for the facets
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"))+
+    panel_border() 
+}
+
+PlotwtED()
+
+#Figure 2E
+PlotEDvsDensityFinal<-function(df, yAxis,tittle){
+  ggplot()+
+    geom_point(data = df,aes(y=WmeanDist,x=.data[[yAxis]], shape =Region ),size=4)+
+    #geom_smooth(data = df,aes(y=WmeanDist,x=.data[[yAxis]],color = Strain, shape =Region ),size=4)+
+    geom_abline(intercept = 10.683, slope = 44.416, color = "Black")+
+    #geom_text(x=.3, y=30, label= bquote(paste("R"^2*"=0.3368")))+
+    #geom_text(x=.3, y=10, label= "bl")+
+    annotate(geom="text", x=.3, y=10, label=bquote(paste("R"^2*"=0.3368")))+
+    #geom_abline(intercept = 9.011, slope = 37.488, color = "Green")+
+    #geom_abline(intercept = 9.519, slope = 50.800, color = "Red")+
+    labs(title =tittle, y = "Mean Enrichment Distance", x = "Bacterial Density")+
+    scale_shape_manual(values=c(16, 1))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5))
+}
+PlotEDvsDensityFinal(EdSlice %>% filter(Strain == "wt"), "TotalRatio","")
 
 ```
 
