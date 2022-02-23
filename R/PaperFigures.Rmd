@@ -9,7 +9,6 @@ editor_options:
 
 ```{r setup, include=FALSE}
 library(pixmap)
-library(rtiff)
 library(reshape2)
 library(gplots)
 library(gdata)
@@ -30,7 +29,7 @@ library(stringr)
 #Figure 1A CFU data wt
 #####
 #CFU data from Carolyn
-CFUdata<-read.csv("/Users/jupabago/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/CFU_wound_All_dataTidy.csv",header = TRUE)
+CFUdata<-read.csv("/Users/jupabago/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/From Carolyn/CFU_wound_All_dataTidy.csv",header = TRUE)
 CFUdata$Condition<-as.factor(CFUdata$Condition)
    CFUdata$Day<-as.factor(CFUdata$Day)
    CFUdata$Species<-as.factor(CFUdata$Species)
@@ -38,6 +37,7 @@ CFUdata$Condition<-as.factor(CFUdata$Condition)
 CFUdata$Condition <- factor(CFUdata$Condition, levels = c("mono", "co-wt", "co-pqsL"))
 CFUstats<-CFUdata%>%group_by(Species,Condition,Strain,Day) %>% mutate(MeanCFU = mean(CFU), SECFU = std.error(CFU))
 CFUstats$Condition <- factor(CFUstats$Condition, levels = c("mono", "co-wt", "co-pqsL"))
+
 PlotCFUs<- function(){
 ggplot()+
   geom_col(data = CFUstats %>% filter(Day == "4", Condition %in% c("mono", "co-wt"), Strain == "wt"),aes(x=Species,y=MeanCFU, fill = Condition),
@@ -137,13 +137,13 @@ PlotBiomassPoints()
 #####
 
 ```
-
+#####
 
 ```{r figure 2 Core vs Edge}
 
 #Figure 2A: Percent CFU inner wound
 ##### 
-CFUInOutData<-read.csv("/Users/jupabago/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/Inside_Outside_CFUcm2_Day4Tidy.csv",header = TRUE)
+CFUInOutData<-read.csv("/Users/jupabago/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/From Carolyn/Inside_Outside_CFUcm2_Day4Tidy.csv",header = TRUE)
 CFUInOutData<-Filter(function(x)!all(is.na(x)), CFUInOutData)#this is to remove columns with NA
 CFUInOutData <- na.omit(CFUInOutData) #removing rows with NA
 CFUInOutData$Condition<-as.factor(CFUInOutData$Condition)
@@ -151,7 +151,7 @@ CFUInOutData$Sample<-as.factor(CFUInOutData$Sample)
 CFUInOutData$Species<-as.factor(CFUInOutData$Species)
 CFUInOutData$Strain<-as.factor(CFUInOutData$Strain)
 
-CFUInOutDataPost<-CFUInOutData %>% mutate(CFU.Inside = Inside.Bandage+Inside.Tissue, CFU.Outside = Outside.Tissue+Outside.Bandage) %>% mutate(PercentIn = 100*CFU.Outside/(CFU.Inside+CFU.Outside))
+CFUInOutDataPost<-CFUInOutData %>% mutate(CFU.Inside = Inside.Bandage+Inside.Tissue, CFU.Outside = Outside.Tissue+Outside.Bandage) %>% mutate(PercentIn = 100*CFU.Inside/(CFU.Inside+CFU.Outside))
 
 CFUInOutStats<-CFUInOutDataPost%>% group_by(Species,Strain,Condition) %>% summarise(meanInPercent = mean(PercentIn), SEInPercent = std.error(PercentIn))
 CFUInOutStatsWt<-CFUInOutStats %>% filter(!Condition=="co-pqsL") %>% filter(Strain == "wt")
@@ -164,7 +164,7 @@ PlotInCFUs<- function(){
     scale_fill_grey(labels = c("Mono-culture","Co-culture"))+
     scale_y_continuous(expand = expand_scale(mult = c(0, 0)))+
   #labs(x = "", y = expression(paste(Log[10], " CFU")), linetype = "")+
-    labs(x = "",y = bquote(paste("% CFU/", "cm"^2*" in healing edge")))+
+    labs(x = "",y = bquote(paste("% CFU/", "cm"^2*" in wound core")))+
   theme_cowplot()+
   theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
         strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
@@ -183,7 +183,7 @@ PlotInCFUs2<- function(){
     geom_jitter(data = CFUInOutPostWt,aes(x=Species,y=PercentIn, color = Condition),size=3,position = position_jitterdodge(jitter.height = 0,jitter.width = 0.2, dodge.width = .9))+
     geom_errorbar(data = CFUInOutStatsWt,aes(x=Species,ymin=(meanInPercent), ymax = (meanInPercent), group = Condition),width = .4, size=.5,position = position_dodge(width = .9))+
     scale_color_grey(labels = c("Mono-culture","Co-culture"))+
-    scale_y_continuous(expand = expand_scale(mult = c(0, 0)), limits = c(0,75))+
+    scale_y_continuous(expand = expand_scale(mult = c(0, 0)), limits = c(0,100))+
   #labs(x = "", y = expression(paste(Log[10], " CFU")), linetype = "")+
     labs(x = "",y = bquote(paste("% CFU/", "cm"^2*" in healing edge")))+
   theme_cowplot()+
@@ -194,6 +194,9 @@ PlotInCFUs2<- function(){
 }  
 figure2A2<-PlotInCFUs2()
 figure2A2
+
+#With the mutants
+
 #####
 #Figure 2B
 #####
@@ -212,6 +215,7 @@ ggplot()+
     facet_grid(.~Species)+
     scale_shape_manual(values=c(16, 1))+
     scale_color_grey(labels = c("Mono-culture","Co-culture"))+
+    scale_x_discrete(labels = c("Planktonic", "5-10", "10-100", "100-1000", ">1000"))+
     labs(y = paste("Frequency (%)"),x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
     theme_cowplot()+
     panel_border() +
@@ -225,7 +229,31 @@ PlotHistSumFinal(HistReplicateSummary%>% filter(Condition == "Sa mono" |Conditio
             HistCondRegionSum%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
             "NormalizedFrequency", "Culture")
 
-PlotHistSum(HistReplicateSummary%>% filter(Culture =="co"),
+#only difference between these two should be "scale_color_grey"
+PlotHistSumFinalStrains<-function(rep.df,cond.df,region.df, y_var, colorStrain){
+ggplot()+
+    geom_point(data = rep.df %>% filter(TimePoint=="Day 4"),
+                aes(x=as.factor(LogBin),y=.data[[y_var]], color =.data[[colorStrain]], shape = Region),
+               position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 1),size=2)+
+    geom_point(data = region.df%>% filter(TimePoint=="Day 4"),
+               aes(x=as.factor(LogBin),y=.data[[y_var]], color =.data[[colorStrain]],shape = Region),
+               size=5, position = position_dodge(width = 1) )+
+    geom_errorbar(data = cond.df%>% filter(TimePoint=="Day 4"),
+               aes(x=as.factor(LogBin),ymin=.data[[y_var]],ymax=.data[[y_var]], group =.data[[colorStrain]]),width = .8,position = position_dodge(width = 1) )+
+    facet_grid(.~Species)+
+    scale_shape_manual(values=c(16, 1))+
+    scale_color_grey(labels = c(bquote(paste(italic('S. aureus + P. aeruginosa '))),
+                                bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"pqsL"))), 
+                                bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"phz")))))+
+    scale_x_discrete(labels = c("Planktonic", "5-10", "10-100", "100-1000", ">1000"))+
+    labs(y = paste("Frequency (%)"),x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")), color = "Condition")+
+    theme_cowplot()+
+    panel_border() +
+    theme(plot.title = element_text(hjust = 0.5), 
+        strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
+        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
+}#only difference between these two should be "scale_color_grey
+PlotHistSumFinalStrains(HistReplicateSummary%>% filter(Culture =="co"),
             HistConditionSummary%>% filter(Culture =="co"),
             HistCondRegionSum%>% filter(Culture =="co"),
             "NormalizedFrequency","Strain")
@@ -389,7 +417,7 @@ ggplot()+
 }
 PlotAbData3(AbDataUnstructureStats,"Species","MeanRatio","SESurvival", "Condition")
 PlotAbData3(AbDataUnstructureStats,"Species","MeanDifference","SEDifference", "Condition")
-#now using the jitter points
+#now using the jittel points
 
 PlotAbData4<-function(){
 ggplot()+
