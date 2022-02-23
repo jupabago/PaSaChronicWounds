@@ -9,6 +9,7 @@ editor_options:
 
 ```{r setup, include=FALSE}
 library(pixmap)
+library(rtiff)
 library(reshape2)
 library(gplots)
 library(gdata)
@@ -136,7 +137,7 @@ PlotBiomassPoints()
 #####
 
 ```
-#####
+
 
 ```{r figure 2 Core vs Edge}
 
@@ -193,9 +194,6 @@ PlotInCFUs2<- function(){
 }  
 figure2A2<-PlotInCFUs2()
 figure2A2
-
-#With the mutants
-
 #####
 #Figure 2B
 #####
@@ -214,7 +212,6 @@ ggplot()+
     facet_grid(.~Species)+
     scale_shape_manual(values=c(16, 1))+
     scale_color_grey(labels = c("Mono-culture","Co-culture"))+
-    scale_x_discrete(labels = c("Planktonic", "5-10", "10-100", "100-1000", ">1000"))+
     labs(y = paste("Frequency (%)"),x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
     theme_cowplot()+
     panel_border() +
@@ -228,31 +225,7 @@ PlotHistSumFinal(HistReplicateSummary%>% filter(Condition == "Sa mono" |Conditio
             HistCondRegionSum%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
             "NormalizedFrequency", "Culture")
 
-#only difference between these two should be "scale_color_grey"
-PlotHistSumFinalStrains<-function(rep.df,cond.df,region.df, y_var, colorStrain){
-ggplot()+
-    geom_point(data = rep.df %>% filter(TimePoint=="Day 4"),
-                aes(x=as.factor(LogBin),y=.data[[y_var]], color =.data[[colorStrain]], shape = Region),
-               position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 1),size=2)+
-    geom_point(data = region.df%>% filter(TimePoint=="Day 4"),
-               aes(x=as.factor(LogBin),y=.data[[y_var]], color =.data[[colorStrain]],shape = Region),
-               size=5, position = position_dodge(width = 1) )+
-    geom_errorbar(data = cond.df%>% filter(TimePoint=="Day 4"),
-               aes(x=as.factor(LogBin),ymin=.data[[y_var]],ymax=.data[[y_var]], group =.data[[colorStrain]]),width = .8,position = position_dodge(width = 1) )+
-    facet_grid(.~Species)+
-    scale_shape_manual(values=c(16, 1))+
-    scale_color_grey(labels = c(bquote(paste(italic('S. aureus + P. aeruginosa '))),
-                                bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"pqsL"))), 
-                                bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"phz")))))+
-    scale_x_discrete(labels = c("Planktonic", "5-10", "10-100", "100-1000", ">1000"))+
-    labs(y = paste("Frequency (%)"),x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")), color = "Condition")+
-    theme_cowplot()+
-    panel_border() +
-    theme(plot.title = element_text(hjust = 0.5), 
-        strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
-        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
-}#only difference between these two should be "scale_color_grey
-PlotHistSumFinalStrains(HistReplicateSummary%>% filter(Culture =="co"),
+PlotHistSum(HistReplicateSummary%>% filter(Culture =="co"),
             HistConditionSummary%>% filter(Culture =="co"),
             HistCondRegionSum%>% filter(Culture =="co"),
             "NormalizedFrequency","Strain")
@@ -416,7 +389,7 @@ ggplot()+
 }
 PlotAbData3(AbDataUnstructureStats,"Species","MeanRatio","SESurvival", "Condition")
 PlotAbData3(AbDataUnstructureStats,"Species","MeanDifference","SEDifference", "Condition")
-#now using the jittel points
+#now using the jitter points
 
 PlotAbData4<-function(){
 ggplot()+
