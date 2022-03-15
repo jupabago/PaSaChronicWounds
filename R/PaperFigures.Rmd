@@ -25,7 +25,7 @@ library(stringr)
 
 ```
 
-```{r figure 1}
+```{r figure 1 and 3}
 #Figure 1A CFU data wt
 #####
 #CFU data from Carolyn
@@ -95,9 +95,16 @@ BiomassDataStats<-BiomassData %>%
   summarise(MeanAggs= mean(Aggs),MeanBiomass = mean(Biomass), SEBiomass = std.error(Biomass), MeanBiomassLog = mean(log10(Biomass)), SEBiomassLog = std.error((log10(Biomass))), MeanMeanAggSize = mean(MeanAggSize), SEMeanAggSize = std.error(MeanAggSize))
 
 BiomassDataWt = BiomassData%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono") %>% filter(TimePoint == "Day 4" )
+BiomassDataMut = BiomassData%>% filter(Culture == "co")  %>% filter(TimePoint == "Day 4" )
 biomassWTData = BiomassDataStats%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono") %>% filter(TimePoint == "Day 4" )
+biomassMutData = BiomassDataStats%>% filter(Culture == "co")  %>% filter(TimePoint == "Day 4" )
+
 #Carolyn wanted to play with the data so here it is:
 write.csv(BiomassDataWt,"/Users/jupabago/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/CSV exports/BiomassWT.csv", row.names = T)
+write.csv(HistReplicateSummary,"/Users/jpb/Library/Mobile Documents/com~apple~CloudDocs/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/CSV exports/ReplicateData.csv", row.names = T)
+write.csv(HistConditionSummary,"/Users/jpb/Library/Mobile Documents/com~apple~CloudDocs/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/CSV exports/ConditionData.csv", row.names = T)
+write.csv(HistCondRegionSum,"/Users/jpb/Library/Mobile Documents/com~apple~CloudDocs/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/CSV exports/RegionData.csv", row.names = T)
+
 
 PlotBiomass<- function(){
   ggplot()+
@@ -134,6 +141,47 @@ PlotBiomassPoints<- function(){
           axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,2,0),size=11))
 }
 PlotBiomassPoints()
+
+PlotBiomassPointsMutants<- function(){
+  ggplot()+
+    geom_jitter(data = BiomassDataMut,aes(x=Species,y=Biomass, color = Strain),size=3,position = position_jitterdodge(jitter.height = 0,jitter.width = 0.2, dodge.width = .9))+
+    geom_errorbar(data = biomassMutData, aes(x=Species,ymin=(MeanBiomass), ymax = (MeanBiomass), group = Strain)
+                ,width = .4, size=.5,position = position_dodge(width = .9))+
+    scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)),
+                  limits = c(1, 10e7), expand = expand_scale(mult = c(0, 0)))+
+    scale_color_brewer(palette = "Set1",
+      labels = c(bquote(paste(italic('S. aureus + P. aeruginosa '))),
+                                bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"pqsL"))), 
+                                bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"phz")))))+
+    
+    labs(x = "",y = bquote(paste("Biomass per image (", mu*"m"^3*")")), color = "Condition")+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
+          axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(face = "italic",margin = margin(1,0,0,0),size=13),
+          axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,2,0),size=11))
+}
+PlotBiomassPointsMutantsViolin<- function(){
+  ggplot()+
+    geom_violin(data = BiomassDataMut,aes(x=Species,y=Biomass, color = Strain))+
+    geom_errorbar(data = biomassMutData, aes(x=Species,ymin=(MeanBiomass), ymax = (MeanBiomass), group = Strain)
+                ,width = .4, size=.5,position = position_dodge(width = .9))+
+    scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)),
+                  limits = c(1, 10e7), expand = expand_scale(mult = c(0, 0)))+
+    scale_color_brewer(palette = "Set1",
+      labels = c(bquote(paste(italic('S. aureus + P. aeruginosa '))),
+                                bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"pqsL"))), 
+                                bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"phz")))))+
+    
+    labs(x = "",y = bquote(paste("Biomass per image (", mu*"m"^3*")")), color = "Condition")+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5),strip.text = element_text(size = 9, face = "italic",margin = margin(.1,0,.1,0, "cm")),
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"),
+          axis.title.x = element_text(margin = margin(0,0,0,0),size=13),axis.text.x = element_text(face = "italic",margin = margin(1,0,0,0),size=13),
+          axis.title.y = element_text(margin = margin(0,4,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,2,0),size=11))
+}
+PlotBiomassPointsMutants()
+PlotBiomassPointsMutantsViolin()
 #####
 
 ```
@@ -257,6 +305,37 @@ PlotHistSumFinalStrains(HistReplicateSummary%>% filter(Culture =="co"),
             HistConditionSummary%>% filter(Culture =="co"),
             HistCondRegionSum%>% filter(Culture =="co"),
             "NormalizedFrequency","Strain")
+
+PlotHistSumFinalStrainsViolin<-function(rep.df,cond.df,region.df, y_var, colorStrain){#doesn't include region
+ggplot()+
+    geom_violin(data = rep.df %>% filter(TimePoint=="Day 4"),
+                scale = "width", trim = F,
+                aes(x=as.factor(LogBin),y=.data[[y_var]], color =.data[[colorStrain]]))+
+    geom_point(data = region.df%>% filter(TimePoint=="Day 4"),
+               aes(x=as.factor(LogBin),y=.data[[y_var]], color =.data[[colorStrain]],shape = Region),
+               size=5, position = position_dodge(width = 1) )+
+    geom_errorbar(data = cond.df%>% filter(TimePoint=="Day 4"),
+               aes(x=as.factor(LogBin),ymin=.data[[y_var]],ymax=.data[[y_var]], group =.data[[colorStrain]]),width = .8,position = position_dodge(width = 1) )+
+    facet_grid(.~Species)+
+    scale_shape_manual(values=c(16, 1))+
+    scale_color_brewer(palette = "Set1",
+                       labels = c(bquote(paste(italic('S. aureus + P. aeruginosa '))),
+                                bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"pqsL"))), 
+                                bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"phz")))))+
+    scale_x_discrete(labels = c("Planktonic", "5-10", "10-100", "100-1000", ">1000"))+
+    labs(y = paste("Frequency (%)"),x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")), color = "Condition")+
+    theme_cowplot()+
+    panel_border() +
+    theme(plot.title = element_text(hjust = 0.5), 
+        strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
+        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
+}#only difference between these two should be "scale_color_grey
+PlotHistSumFinalStrainsViolin(HistReplicateSummary%>% filter(Culture =="co"),
+            HistConditionSummary%>% filter(Culture =="co"),
+            HistCondRegionSum%>% filter(Culture =="co"),
+            "NormalizedFrequency","Strain")
+
+
 
 #####
 #Figure 2C
