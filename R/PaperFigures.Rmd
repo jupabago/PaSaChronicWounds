@@ -149,7 +149,7 @@ PlotBiomassPointsMutants<- function(){
                 ,width = .4, size=.5,position = position_dodge(width = .9))+
     scale_y_log10(breaks = scales::trans_breaks("log10", function(x) 10^x), labels = scales::trans_format("log10", scales::math_format(10^.x)),
                   limits = c(1, 10e7), expand = expand_scale(mult = c(0, 0)))+
-    scale_color_brewer(palette = "Set1",
+    scale_color_manual(values=c("#000000", "#3964C3", "#D34328"),
       labels = c(bquote(paste(italic('S. aureus + P. aeruginosa '))),
                                 bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"pqsL"))), 
                                 bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"phz")))))+
@@ -277,6 +277,33 @@ PlotHistSumFinal(HistReplicateSummary%>% filter(Condition == "Sa mono" |Conditio
             HistCondRegionSum%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
             "NormalizedFrequency", "Culture")
 
+PlotHistSumFinalViolin<-function(rep.df,cond.df,region.df, y_var, colorStrain){
+ggplot()+
+    geom_violin(data = rep.df %>% filter(TimePoint=="Day 4"),
+                scale = "width", trim = F,
+                aes(x=as.factor(LogBin),y=.data[[y_var]], color =.data[[colorStrain]]))+
+    geom_point(data = region.df%>% filter(TimePoint=="Day 4"),
+               aes(x=as.factor(LogBin),y=.data[[y_var]], color =.data[[colorStrain]],shape = Region),
+               size=3, position = position_dodge(width = .75) )+
+    geom_errorbar(data = cond.df%>% filter(TimePoint=="Day 4"),
+               aes(x=as.factor(LogBin),ymin=.data[[y_var]],ymax=.data[[y_var]], group =.data[[colorStrain]]),width = .5,position = position_dodge(width = .75) )+
+    facet_grid(.~Species)+
+    scale_shape_manual(values=c(16, 1))+
+    scale_color_grey(labels = c("Mono-culture","Co-culture"))+
+    scale_x_discrete(labels = c("Planktonic", "5-10", "10-100", "100-1000", ">1000"))+
+    labs(y = paste("Frequency (%)"),x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    theme_cowplot()+
+    panel_border() +
+    theme(plot.title = element_text(hjust = 0.5), 
+        strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
+        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
+}
+
+PlotHistSumFinalViolin(HistReplicateSummary%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
+            HistConditionSummary%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
+            HistCondRegionSum%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
+            "NormalizedFrequency", "Culture")
+
 #only difference between these two should be "scale_color_grey"
 PlotHistSumFinalStrains<-function(rep.df,cond.df,region.df, y_var, colorStrain){
 ggplot()+
@@ -309,7 +336,7 @@ PlotHistSumFinalStrains(HistReplicateSummary%>% filter(Culture =="co"),
 PlotHistSumFinalStrainsViolin<-function(rep.df,cond.df,region.df, y_var, colorStrain){#doesn't include region
 ggplot()+
     geom_violin(data = rep.df %>% filter(TimePoint=="Day 4"),
-                scale = "width", trim = F,
+                scale = "width", trim = T,
                 aes(x=as.factor(LogBin),y=.data[[y_var]], color =.data[[colorStrain]]))+
     geom_point(data = region.df%>% filter(TimePoint=="Day 4"),
                aes(x=as.factor(LogBin),y=.data[[y_var]], color =.data[[colorStrain]],shape = Region),
@@ -318,7 +345,7 @@ ggplot()+
                aes(x=as.factor(LogBin),ymin=.data[[y_var]],ymax=.data[[y_var]], group =.data[[colorStrain]]),width = .8,position = position_dodge(width = 1) )+
     facet_grid(.~Species)+
     scale_shape_manual(values=c(16, 1))+
-    scale_color_brewer(palette = "Set1",
+    scale_color_manual(values=c("#000000", "#3964C3", "#D34328"),
                        labels = c(bquote(paste(italic('S. aureus + P. aeruginosa '))),
                                 bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"pqsL"))), 
                                 bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"phz")))))+
@@ -335,19 +362,17 @@ PlotHistSumFinalStrainsViolin(HistReplicateSummary%>% filter(Culture =="co"),
             HistCondRegionSum%>% filter(Culture =="co"),
             "NormalizedFrequency","Strain")
 
-
-
 #####
-#Figure 2C
+#Figure 2D
 #Aggregation inner vs outer region
 #####
 PlotAggCore<-function(rep.df,region.df, y_var, title,colorStrain, facet){
 ggplot()+
     geom_point(data = rep.df %>% filter(TimePoint=="Day 4"),
-                aes(x=Region,y=.data[[y_var]], color =.data[[colorStrain]]),
-               position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75),size=3)+
+                aes(x=.data[[colorStrain]],y=.data[[y_var]], shape = Region, color =.data[[colorStrain]]),
+               position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75),size=3, show.legend = F)+
     geom_errorbar(data = region.df%>% filter(TimePoint=="Day 4"),
-               aes(x=Region,ymin=.data[[y_var]],ymax=.data[[y_var]], group =.data[[colorStrain]]),
+               aes(x=.data[[colorStrain]],ymin=.data[[y_var]],ymax=.data[[y_var]], group =Region),
                size=.5,width = 0.5, position = position_dodge(width = .75) )+
     #geom_point(data = cond.df%>% filter(TimePoint=="Day 4"),
      #          aes(x=Region,y=.data[[y_var]],  color =.data[[colorStrain]]),size=4, shape = 3,position = position_dodge(width = .75) )+
@@ -355,6 +380,7 @@ ggplot()+
     facet_grid(.~.data[[facet]])+
     scale_shape_manual(values=c(16, 1))+
     scale_color_grey(labels = c("Mono-culture","Co-culture"))+
+    scale_x_discrete(labels = c("Mono-culture","Co-culture"))+
     ggtitle(title)+
     labs(y = paste("Planktonic Biomass Contribution (%)"), x = "")+
     theme_cowplot()+
@@ -368,7 +394,42 @@ PlotAggCore(plankAggHistRep%>% filter(Strain %in% c("Sa", "wt")) %>% filter(Aggr
              plankAggHistCondReg%>% filter(Strain %in% c("Sa", "wt"))%>% filter(Aggregation=="Planktonic"),
              "AgPlNormBiomass", "", "Culture", "Species")
 
-#Figure 2D
+PlotAggCoreMut<-function(rep.df,region.df, y_var, title,colorStrain, facet){
+ggplot()+
+    geom_point(data = rep.df %>% filter(TimePoint=="Day 4"),
+                aes(x=Region,y=.data[[y_var]], shape = Region, color =.data[[colorStrain]]),
+               position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75),size=3)+
+    geom_errorbar(data = region.df%>% filter(TimePoint=="Day 4"),
+               aes(x=Region,ymin=.data[[y_var]],ymax=.data[[y_var]], group =Strain),
+               size=.5,width = 0.5, position = position_dodge(width = .75) )+
+    #geom_point(data = cond.df%>% filter(TimePoint=="Day 4"),
+     #          aes(x=Region,y=.data[[y_var]],  color =.data[[colorStrain]]),size=4, shape = 3,position = position_dodge(width = .75) )+
+    scale_y_log10(breaks = c(100, 10, 1, .1, .01), labels = c(100, 10, 1, .1, .01))+
+    facet_grid(.~.data[[facet]])+
+    scale_shape_manual(values=c(16, 1))+
+    scale_color_manual(values=c("#000000", "#3964C3", "#D34328"),
+                       labels = c(bquote(paste(italic('S. aureus + P. aeruginosa '))),
+                                bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"pqsL"))), 
+                                bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"phz")))))+
+    ggtitle(title)+
+    labs(y = paste("Planktonic Biomass Contribution (%)"), x = "")+
+    theme_cowplot()+
+    panel_border() +
+    theme(plot.title = element_text(hjust = 0.5), 
+        strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
+        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
+}
+
+PlotAggCoreMut(plankAggHistRep%>% filter(Culture=="co") %>% filter(Aggregation=="Planktonic"),
+             plankAggHistCondReg%>% filter(Culture=="co")%>% filter(Aggregation=="Planktonic"),
+             "AgPlNormBiomass", "", "Strain", "Species")
+
+
+#####
+
+#Figure 2E
+## Enrichment distance
+#####
 ##Marvin suggested doing the enrichment distance for those samples, but I guess there is nothing to compare, unless I do core vs edge
 ##ggplot code from PropOc Data 3D
 PlotwtED<-function(){
@@ -378,7 +439,7 @@ df2<-pOEnrMetaClean %>% filter(Relation == "Pa->Sa", TimePoint=="Day 4", Conditi
     geom_errorbar(data = df1,aes(y=meanED,ymax=meanED,ymin=meanED, group = Region,x = Condition),
                     position = position_dodge(width = .75), width = 0.5)+
     geom_point(data = df2,aes(y=WmeanDist,x = Condition, shape = Region),position = position_jitterdodge(jitter.height = 0, jitter.width = .3,dodge.width = 0.75),size=3)+
-    labs(y = expression("Enrichment distance ("*mu*"m)"), x = "") +
+    labs(y = expression(atop("Enrichment distance ("*mu*"m)",paste(italic("S. aureus") %->% italic("S. aureus ")))), x = "") +
     scale_color_grey()+
     scale_x_discrete(labels = c(""))+
     scale_shape_manual(values=c(16, 1))+
@@ -390,8 +451,26 @@ df2<-pOEnrMetaClean %>% filter(Relation == "Pa->Sa", TimePoint=="Day 4", Conditi
 }
 
 PlotwtED()
+#In this case, i want an actual x axis, but the top may work for reference
+PlotwtED2<-function(){
+df1<-pOEnrMetaStatsRegion %>% filter(Relation == "Pa->Sa", TimePoint=="Day 4", Condition == "wt co")
+df2<-pOEnrMetaClean %>% filter(Relation == "Pa->Sa", TimePoint=="Day 4", Condition == "wt co")
+  ggplot()+
+    geom_errorbar(data = df1,aes(y=meanED,ymax=meanED,ymin=meanED, x = Region), width = .5)+
+    geom_point(data = df2,aes(y=WmeanDist,x = Region, shape = Region),position = position_jitter(height = 0, width = .2),size=3, show.legend = F)+
+    labs(y = expression(atop("Enrichment distance ("*mu*"m)",paste(italic("S. aureus") %->% italic("S. aureus ")))), x = "") +
+    scale_color_grey()+
+    scale_shape_manual(values=c(16, 1))+
+    theme_cowplot()+
+    theme(plot.title = element_text(hjust = 0.5),
+          strip.text = element_text(size = 12,margin = margin(.1,0,.1,0, "cm")),#this is for the facets
+          strip.background = element_rect(color="black", fill="white", size=.5, linetype="solid"))+
+    panel_border() 
+}
 
-#Figure 2E
+PlotwtED2()
+#####
+#Figure 2F
 PlotEDvsDensityFinal<-function(df, yAxis,tittle){
   ggplot()+
     geom_point(data = df,aes(y=WmeanDist,x=.data[[yAxis]], shape =Region ),size=4)+
