@@ -280,6 +280,7 @@ PlotHistSumFinal(HistReplicateSummary%>% filter(Condition == "Sa mono" |Conditio
             HistCondRegionSum%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
             "NormalizedFrequency", "Culture")
 
+HistCondRegionSum = HistCondRegionSum %>% unite(CultureRegion, Culture, Region, sep = " ", remove = FALSE)
 PlotHistSumFinalViolin<-function(rep.df,cond.df,region.df, y_var, colorStrain){
 ggplot()+
     geom_violin(data = rep.df %>% filter(TimePoint=="Day 4"),
@@ -292,21 +293,32 @@ ggplot()+
                aes(x=as.factor(LogBin),ymin=.data[[y_var]],ymax=.data[[y_var]], group =.data[[colorStrain]]),width = .6,position = position_dodge(width = .75) )+
     facet_grid(.~Species)+
     scale_shape_manual(values=c( 16,17,1,2))+
-    scale_linetype_manual(values=c( "dashed","solid"),labels = c("Mono-infection","Co-infection"))+
+    scale_linetype_manual(values=c( "solid","solid"),labels = c("Mono-infection","Co-infection"))+
     scale_x_discrete(labels = c("Planktonic", "5-10", "10-100", "100-1000", ">1000"))+
     labs(y = paste("Frequency (%)"),x = bquote(paste("Aggregate Volume (", mu*"m"^3*")")))+
+    
     theme_cowplot()+
     panel_border() +
     theme(plot.title = element_text(hjust = 0.5), 
         strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
-        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
+        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"),#facet background
+        axis.title.x = element_text(margin = margin(0,0,0,0),size=13 ),axis.text.x = element_text(margin = margin(1,0,2,0),size=11),
+        axis.title.y = element_text(margin = margin(0,0,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,0,0),size=11))
 }
 
-PlotHistSumFinalViolin(HistReplicateSummary%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
+Figure2C<-PlotHistSumFinalViolin(HistReplicateSummary%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
             HistConditionSummary%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
             HistCondRegionSum%>% filter(Condition == "Sa mono" |Condition == "wt co"|Condition == "wt mono"),
             "NormalizedFrequency", "Culture")
-HistCondRegionSum = HistCondRegionSum %>% unite(CultureRegion, Culture, Region, sep = " ", remove = FALSE)
+
+ggsave(plot = Figure2C,
+       file="/Users/jpb/Library/Mobile Documents/com~apple~CloudDocs/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/EPS Figures/Figure2C.EPS",
+device = cairo_ps, 
+width = 25,
+height = 10, 
+units = "cm")
+
+
 
 #only difference between these two should be "scale_color_grey"
 PlotHistSumFinalStrains<-function(rep.df,cond.df,region.df, y_var, colorStrain){
@@ -419,7 +431,7 @@ ggplot()+
     scale_shape_manual(values=c( 16,17,1,2))+
     #scale_color_grey(labels = c("Mono-culture","Co-culture"))+
     scale_x_discrete(labels = c("Mono-infection","Co-infection"))+
-    scale_linetype_manual(values=c( "dashed","solid"),labels = c("Mono-infection","Co-infection"))+
+    scale_linetype_manual(values=c( "solid","solid"),labels = c("Mono-infection","Co-infection"))+
     labs(y = paste("Planktonic Biomass Contribution (%)"), x = "")+
     theme_cowplot()+
     panel_border() +
@@ -448,18 +460,22 @@ ggplot()+
     scale_shape_manual(values=c( 16,17,1,2))+
     #scale_color_grey(labels = c("Mono-infection","Co-culture"))+
     scale_x_discrete(labels = c(bquote(italic('P. aeruginosa')),bquote(italic('S. aureus'))))+
-    scale_linetype_manual(values=c( "dashed","solid"),labels = c("Mono-infection","Co-infection"))+
+    scale_linetype_manual(values=c( "solid","solid"),labels = c("Mono-infection","Co-infection"))+
     labs(y = paste("Planktonic Biomass Contribution (%)"), x = "")+
     theme_cowplot()+
     panel_border() +
     theme(plot.title = element_text(hjust = 0.5), 
         strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
-        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
+        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"),#facet background
+        axis.title.x = element_text(margin = margin(0,0,0,0),size=13 ),axis.text.x = element_text(margin = margin(1,0,2,0),size=11),
+        axis.title.y = element_text(margin = margin(0,0,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,0,0),size=11))
 }
-PlotAggCoreViolin(plankAggHistRep%>% filter(Strain %in% c("Sa", "wt")) %>% filter(Aggregation=="Planktonic"),
+Figure2D<-PlotAggCoreViolin(plankAggHistRep%>% filter(Strain %in% c("Sa", "wt")) %>% filter(Aggregation=="Planktonic"),
              plankAggHistCondReg%>% filter(Strain %in% c("Sa", "wt"))%>% filter(Aggregation=="Planktonic"),
              plankAggHistCond%>% filter(Strain %in% c("Sa", "wt"))%>% filter(Aggregation=="Planktonic"),
              "AgPlNormBiomass", "Culture", "Species")
+
+ggsave(Figure2D, file="/Users/jpb/Library/Mobile Documents/com~apple~CloudDocs/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/EPS Figures/Figure2D.EPS", device="eps", width = 5.5, height = 4.5)
 #####
 ### Mutants
 PlotAggCoreMut<-function(rep.df,region.df, y_var, title,colorStrain, facet){
@@ -488,11 +504,47 @@ ggplot()+
         strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"))#facet background
 }
 
-PlotAggCoreMut(plankAggHistRep%>% filter(Culture=="co") %>% filter(Aggregation=="Planktonic"),
-             plankAggHistCondReg%>% filter(Culture=="co")%>% filter(Aggregation=="Planktonic"),
-             plankAggHistCond%>% filter(Culture=="co")%>% filter(Aggregation=="Planktonic"),
+PlotAggCoreMut(plankAggHistRep %>% filter(Aggregation=="Planktonic"),
+             plankAggHistCondReg%>% filter(Aggregation=="Planktonic"),
+             plankAggHistCond%>% filter(Aggregation=="Planktonic"),
              "AgPlNormBiomass", "", "Strain", "Species")
 
+PlotAggCoreViolinFacetMut<-function(rep.df,region.df, cond.df,y_var,colorStrain, facet){
+ggplot()+
+    geom_violin(data = rep.df %>% filter(TimePoint=="Day 4"),
+                aes(x=.data[[colorStrain]],y=.data[[y_var]], color =.data[[colorStrain]]),
+               position = position_dodge(width = 0.75),show.legend = T)+
+    geom_errorbar(data =cond.df %>% filter(TimePoint=="Day 4"),
+               aes(x=.data[[colorStrain]],ymin=.data[[y_var]],ymax=.data[[y_var]]),
+               size=.5,width = 0.5, position = position_dodge(width = .75) )+
+    geom_point(data = region.df%>% filter(TimePoint=="Day 4"),
+               aes(x=.data[[colorStrain]],y=.data[[y_var]],  color = .data[[colorStrain]],shape =Region),size=4, position = position_dodge(width = .75) )+
+    scale_y_log10(breaks = c(100, 10, 1, .1, .01), labels = c(100, 10, 1, .1, .01))+
+    facet_grid(.~.data[[facet]])+
+    scale_shape_manual(values=c( 16,17,1,2))+
+    scale_color_manual(values=c("#000000", "#D34328", "#3964C3"),
+                       labels = c(bquote(paste(italic('S. aureus + P. aeruginosa '))),
+                                bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"pqsL"))), 
+                                bquote(paste(italic('S. aureus + P. aeruginosa '*Delta*"phz")))))+
+    scale_x_discrete(labels = c("","",""))+
+    #scale_linetype_manual(values=c( "dashed","solid"),labels = c("Mono-infection","Co-infection"))+
+    labs(y = paste("Planktonic Biomass Contribution (%)"), x = "")+
+    theme_cowplot()+
+    panel_border() +
+    theme(plot.title = element_text(hjust = 0.5), 
+        strip.text = element_text(size = 11, face = "italic",margin = margin(.1,0,.1,0, "cm")),#this is for the facet text
+        strip.background = element_rect(color="black", fill="white", size=1, linetype="solid"),#facet background
+        axis.title.x = element_text(margin = margin(0,0,0,0),size=13 ),axis.text.x = element_text(margin = margin(1,0,2,0),size=11),
+        axis.title.y = element_text(margin = margin(0,0,0,0),size=13),axis.text.y = element_text(margin = margin(0,0,0,0),size=11))
+}
+
+Figure3C<-PlotAggCoreViolinFacetMut(plankAggHistRep%>% filter(Culture=="co") %>% filter(Aggregation=="Planktonic"),
+             plankAggHistCondReg%>% filter(Culture=="co")%>% filter(Aggregation=="Planktonic"),
+             plankAggHistCond%>% filter(Culture=="co")%>% filter(Aggregation=="Planktonic"),
+             "AgPlNormBiomass", "Strain", "Species")
+
+
+ggsave(Figure3C, file="/Users/jpb/Library/Mobile Documents/com~apple~CloudDocs/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/EPS Figures/Figure3C.EPS", device="eps", width = 7.5, height = 4.5)
 
 #####
 
@@ -567,9 +619,10 @@ PlotEDvsDensityFinal<-function(df, yAxis,tittle){
     theme(plot.title = element_text(hjust = 0.5))
 }
 PlotEDvsDensityFinal(EdSlice %>% filter(Strain == "wt"), "TotalRatio","")
-PlotEDvsDensityFinal2<-function(df, yAxis,tittle){
+
+PlotEDvsDensityFinal2<-function(df, xAxis,tittle){
   ggplot()+
-    geom_point(data = df,aes(y=WmeanDist,x=.data[[yAxis]], color= Strain, shape =Region ),size=4)+
+    geom_point(data = df,aes(x=.data[[xAxis]],y=WmeanDist, color= Strain, shape =Region ),size=4)+
     #geom_smooth(data = df,aes(y=WmeanDist,x=.data[[yAxis]],color = Strain, shape =Region ),size=4)+
     #geom_abline(intercept = 10.683, slope = 44.416, color = "Black")+
     #geom_text(x=.3, y=30, label= bquote(paste("R"^2*"=0.3368")))+
@@ -588,6 +641,7 @@ PlotEDvsDensityFinal2<-function(df, yAxis,tittle){
 }
 
 PlotEDvsDensityFinal2(EdSlice, "TotalRatio","")
+write.csv(EdSlice,"/Users/jpb/Library/Mobile Documents/com~apple~CloudDocs/Documents/Whiteley/PROJECTS/SaPa Chronic Wounds/Data/CSV exports/BacterialSaturationData.csv", row.names = T)
 
 
 ```
